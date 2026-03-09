@@ -1,0 +1,75 @@
+﻿# IntelliJ IDEA
+/.idea/
+*.iml
+/shelf/
+/workspace.xml
+/httpRequests/
+/dataSources/
+/dataSources.local.xml
+
+# VS Code
+/.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Java / Maven / Gradle build outputs
+**/target/
+**/build/
+**/out/
+
+# Logs
+*.log
+logs/
+**/logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Java runtime / crash files
+hs_err_pid*
+replay_pid*
+
+# Node / Vue
+**/node_modules/
+**/dist/
+**/.vite/
+**/coverage/
+**/.npm/
+**/.pnpm-store/
+
+# Env files
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Local config
+application-local.yml
+application-local.yaml
+application-local.properties
+application-dev.yml
+application-dev.yaml
+application-dev.properties
+
+# Archive files
+*.zip
+*.tar
+*.gz
+*.7z
+
+# Generated docs / caches
+.cache/
+**/.cache/
+# Maven generated files
+**/.flattened-pom.xml
+**/dependency-reduced-pom.xml
+
+# Local analysis artifacts
+**/cp.txt
+**/*_javap.txt
