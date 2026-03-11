@@ -11,7 +11,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/rag_bilibili?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
-    password: Zs20060224
+    password: root
 
   sql:
     init:
@@ -27,15 +27,15 @@ spring:
       embedding: dashscope
 
     openai:
-      api-key: ${OPENAI_API_KEY:sk-RBqpsqB81nTRMRQ50W6RrXdhJzFEh5ymy1mU8a12LAPqbIS3}
-      base-url: ${OPENAI_BASE_URL:https://wzw.pp.ua}
+      api-key: ${OPENAI_API_KEY:}
+      base-url: ${OPENAI_BASE_URL:}
       chat:
         options:
           model: deepseek-v3.2
           temperature: 0.7
 
     dashscope:
-      api-key: ${DASHSCOPE_API_KEY:sk-fdfd82a68acf40c08b5edf43764d64d9}
+      api-key: ${DASHSCOPE_API_KEY:}
       embedding:
         options:
           model: text-embedding-v4
@@ -43,8 +43,8 @@ spring:
 
     alibaba:
       dashvector:
-        api-key: ${DASHVECTOR_API_KEY:sk-a6i6OASX8q6QIuJjaizPhJJ9uysyF265996E8194111F1B81FAA45028A5E11}
-        endpoint: ${DASHVECTOR_ENDPOINT:vrs-cn-g9j4ojya40001c.dashvector.cn-shenzhen.aliyuncs.com}
+        api-key: ${DASHVECTOR_API_KEY:}
+        endpoint: ${DASHVECTOR_ENDPOINT:}
         collection: bilibili
 
 mybatis:
