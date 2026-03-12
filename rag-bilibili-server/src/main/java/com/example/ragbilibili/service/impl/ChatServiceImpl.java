@@ -72,21 +72,26 @@ public class ChatServiceImpl implements ChatService {
         // 4. 异步处理
         new Thread(() -> {
             try {
-                // 5. RAG 检索
+                // 5. 发送start事件
+                emitter.send(SseEmitter.event()
+                        .name("start")
+                        .data(String.format("{\"type\":\"start\",\"userMessageId\":%d}", userMessage.getId())));
+
+                // 6. RAG 检索
                 List<Document> relevantDocs = retrieveRelevantDocuments(session, content, userId);
 
-                // 6. 构建上下文
+                // 7. 构建上下文
                 String context = buildContext(relevantDocs);
 
-                // 7. 获取历史消息
+                // 8. 获取历史消息
                 List<Message> historyMessages = messageMapper.selectBySessionId(sessionId);
                 String chatHistory = buildChatHistory(historyMessages);
 
-                // 8. 构建提示词
+                // 9. 构建提示词
                 String systemPrompt = buildSystemPrompt(context);
                 String userPrompt = content;
 
-                // 9. 流式调用 LLM
+                // 10. 流式调用 LLM
                 ChatClient chatClient = chatClientBuilder.build();
                 Flux<ChatResponse> responseFlux = chatClient.prompt()
                         .system(systemPrompt)
@@ -94,19 +99,26 @@ public class ChatServiceImpl implements ChatService {
                         .stream()
                         .chatResponse();
 
-                // 10. 收集完整响应
+                // 11. 收集完整响应
                 StringBuilder fullResponse = new StringBuilder();
 
-                // 11. 流式发送
+                // 12. 流式发送
                 responseFlux.subscribe(
                         response -> {
                             String chunk = response.getResult().getOutput().getText();
                             if (chunk != null && !chunk.isEmpty()) {
                                 fullResponse.append(chunk);
                                 try {
+                                    // 转义JSON字符串中的特殊字符
+                                    String escapedChunk = chunk
+                                            .replace("\\", "\\\\")
+                                            .replace("\"", "\\\"")
+                                            .replace("\n", "\\n")
+                                            .replace("\r", "\\r")
+                                            .replace("\t", "\\t");
                                     emitter.send(SseEmitter.event()
-                                            .data(chunk)
-                                            .name("message"));
+                                            .name("content")
+                                            .data(String.format("{\"type\":\"content\",\"delta\":\"%s\"}", escapedChunk)));
                                 } catch (Exception e) {
                                     log.error("SSE发送失败", e);
                                     emitter.completeWithError(e);
@@ -115,25 +127,58 @@ public class ChatServiceImpl implements ChatService {
                         },
                         error -> {
                             log.error("LLM调用失败", error);
+                            try {
+                                emitter.send(SseEmitter.event()
+                                        .name("error")
+                                        .data(String.format("{\"type\":\"error\",\"message\":\"%s\"}",
+                                                error.getMessage() != null ? error.getMessage().replace("\"", "\\\"") : "未知错误")));
+                            } catch (Exception e) {
+                                log.error("发送错误事件失败", e);
+                            }
                             emitter.completeWithError(error);
                         },
                         () -> {
-                            // 12. 保存助手消息
-                            Message assistantMessage = new Message();
-                            assistantMessage.setSessionId(sessionId);
-                            assistantMessage.setRole(MessageRole.ASSISTANT.getCode());
-                            assistantMessage.setContent(fullResponse.toString());
-                            assistantMessage.setCreateTime(LocalDateTime.now());
-                            messageMapper.insert(assistantMessage);
+                            try {
+                                // 13. 保存助手消息
+                                Message assistantMessage = new Message();
+                                assistantMessage.setSessionId(sessionId);
+                                assistantMessage.setRole(MessageRole.ASSISTANT.getCode());
+                                assistantMessage.setContent(fullResponse.toString());
+                                assistantMessage.setCreateTime(LocalDateTime.now());
+                                messageMapper.insert(assistantMessage);
 
-                            // 13. 完成 SSE
-                            emitter.complete();
-                            log.info("对话完成: sessionId={}, userId={}", sessionId, userId);
+                                // 14. 发送end事件
+                                String escapedFullContent = fullResponse.toString()
+                                        .replace("\\", "\\\\")
+                                        .replace("\"", "\\\"")
+                                        .replace("\n", "\\n")
+                                        .replace("\r", "\\r")
+                                        .replace("\t", "\\t");
+                                emitter.send(SseEmitter.event()
+                                        .name("end")
+                                        .data(String.format("{\"type\":\"end\",\"assistantMessageId\":%d,\"fullContent\":\"%s\"}",
+                                                assistantMessage.getId(), escapedFullContent)));
+
+                                // 15. 完成 SSE
+                                emitter.complete();
+                                log.info("对话完成: sessionId={}, userId={}", sessionId, userId);
+                            } catch (Exception e) {
+                                log.error("发送end事件失败", e);
+                                emitter.completeWithError(e);
+                            }
                         }
                 );
 
             } catch (Exception e) {
                 log.error("对话处理失败: sessionId={}, userId={}", sessionId, userId, e);
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("error")
+                            .data(String.format("{\"type\":\"error\",\"message\":\"%s\"}",
+                                    e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "处理失败")));
+                } catch (Exception ex) {
+                    log.error("发送错误事件失败", ex);
+                }
                 emitter.completeWithError(e);
             }
         }).start();
