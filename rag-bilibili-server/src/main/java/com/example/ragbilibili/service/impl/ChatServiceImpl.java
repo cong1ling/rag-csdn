@@ -1,6 +1,10 @@
 package com.example.ragbilibili.service.impl;
 
 import com.alibaba.cloud.ai.vectorstore.dashvector.DashVectorStore;
+import com.example.ragbilibili.dto.sse.SseContentEvent;
+import com.example.ragbilibili.dto.sse.SseEndEvent;
+import com.example.ragbilibili.dto.sse.SseErrorEvent;
+import com.example.ragbilibili.dto.sse.SseStartEvent;
 import com.example.ragbilibili.entity.Message;
 import com.example.ragbilibili.entity.Session;
 import com.example.ragbilibili.entity.Video;
@@ -12,6 +16,7 @@ import com.example.ragbilibili.mapper.MessageMapper;
 import com.example.ragbilibili.mapper.SessionMapper;
 import com.example.ragbilibili.mapper.VideoMapper;
 import com.example.ragbilibili.service.ChatService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -20,13 +25,14 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class ChatServiceImpl implements ChatService {
@@ -46,6 +52,13 @@ public class ChatServiceImpl implements ChatService {
 
     @Autowired
     private ChatClient.Builder chatClientBuilder;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    @Qualifier("taskExecutor")
+    private TaskExecutor taskExecutor;
 
     private static final int TOP_K = 5;
     private static final long SSE_TIMEOUT = 60000L;
@@ -69,13 +82,14 @@ public class ChatServiceImpl implements ChatService {
         // 3. 创建 SSE Emitter
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
-        // 4. 异步处理
-        new Thread(() -> {
+        // 4. 使用TaskExecutor异步处理
+        taskExecutor.execute(() -> {
             try {
                 // 5. 发送start事件
+                SseStartEvent startEvent = new SseStartEvent(userMessage.getId());
                 emitter.send(SseEmitter.event()
                         .name("start")
-                        .data(String.format("{\"type\":\"start\",\"userMessageId\":%d}", userMessage.getId())));
+                        .data(objectMapper.writeValueAsString(startEvent)));
 
                 // 6. RAG 检索
                 List<Document> relevantDocs = retrieveRelevantDocuments(session, content, userId);
@@ -109,16 +123,10 @@ public class ChatServiceImpl implements ChatService {
                             if (chunk != null && !chunk.isEmpty()) {
                                 fullResponse.append(chunk);
                                 try {
-                                    // 转义JSON字符串中的特殊字符
-                                    String escapedChunk = chunk
-                                            .replace("\\", "\\\\")
-                                            .replace("\"", "\\\"")
-                                            .replace("\n", "\\n")
-                                            .replace("\r", "\\r")
-                                            .replace("\t", "\\t");
+                                    SseContentEvent contentEvent = new SseContentEvent(chunk);
                                     emitter.send(SseEmitter.event()
                                             .name("content")
-                                            .data(String.format("{\"type\":\"content\",\"delta\":\"%s\"}", escapedChunk)));
+                                            .data(objectMapper.writeValueAsString(contentEvent)));
                                 } catch (Exception e) {
                                     log.error("SSE发送失败", e);
                                     emitter.completeWithError(e);
@@ -128,10 +136,11 @@ public class ChatServiceImpl implements ChatService {
                         error -> {
                             log.error("LLM调用失败", error);
                             try {
+                                SseErrorEvent errorEvent = new SseErrorEvent(
+                                        error.getMessage() != null ? error.getMessage() : "未知错误");
                                 emitter.send(SseEmitter.event()
                                         .name("error")
-                                        .data(String.format("{\"type\":\"error\",\"message\":\"%s\"}",
-                                                error.getMessage() != null ? error.getMessage().replace("\"", "\\\"") : "未知错误")));
+                                        .data(objectMapper.writeValueAsString(errorEvent)));
                             } catch (Exception e) {
                                 log.error("发送错误事件失败", e);
                             }
@@ -148,16 +157,12 @@ public class ChatServiceImpl implements ChatService {
                                 messageMapper.insert(assistantMessage);
 
                                 // 14. 发送end事件
-                                String escapedFullContent = fullResponse.toString()
-                                        .replace("\\", "\\\\")
-                                        .replace("\"", "\\\"")
-                                        .replace("\n", "\\n")
-                                        .replace("\r", "\\r")
-                                        .replace("\t", "\\t");
+                                SseEndEvent endEvent = new SseEndEvent(
+                                        assistantMessage.getId(),
+                                        fullResponse.toString());
                                 emitter.send(SseEmitter.event()
                                         .name("end")
-                                        .data(String.format("{\"type\":\"end\",\"assistantMessageId\":%d,\"fullContent\":\"%s\"}",
-                                                assistantMessage.getId(), escapedFullContent)));
+                                        .data(objectMapper.writeValueAsString(endEvent)));
 
                                 // 15. 完成 SSE
                                 emitter.complete();
@@ -172,16 +177,17 @@ public class ChatServiceImpl implements ChatService {
             } catch (Exception e) {
                 log.error("对话处理失败: sessionId={}, userId={}", sessionId, userId, e);
                 try {
+                    SseErrorEvent errorEvent = new SseErrorEvent(
+                            e.getMessage() != null ? e.getMessage() : "处理失败");
                     emitter.send(SseEmitter.event()
                             .name("error")
-                            .data(String.format("{\"type\":\"error\",\"message\":\"%s\"}",
-                                    e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "处理失败")));
+                            .data(objectMapper.writeValueAsString(errorEvent)));
                 } catch (Exception ex) {
                     log.error("发送错误事件失败", ex);
                 }
                 emitter.completeWithError(e);
             }
-        }).start();
+        });
 
         return emitter;
     }

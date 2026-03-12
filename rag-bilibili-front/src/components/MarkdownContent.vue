@@ -5,6 +5,7 @@
 <script setup>
 import { computed } from "vue";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 const props = defineProps({
   content: {
@@ -24,10 +25,23 @@ const renderedHtml = computed(() => {
     return "";
   }
   try {
-    return marked.parse(props.content);
+    const rawHtml = marked.parse(props.content);
+    // 使用DOMPurify净化HTML，防止XSS攻击
+    return DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'p', 'br', 'hr',
+        'ul', 'ol', 'li',
+        'a', 'strong', 'em', 'code', 'pre',
+        'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'img', 'span', 'div'
+      ],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+      ALLOW_DATA_ATTR: false,
+    });
   } catch (error) {
     console.error("Markdown解析失败:", error);
-    return props.content;
+    return DOMPurify.sanitize(props.content);
   }
 });
 </script>
