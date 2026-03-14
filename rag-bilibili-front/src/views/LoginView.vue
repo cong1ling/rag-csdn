@@ -1,5 +1,10 @@
 <template>
   <div class="auth-page">
+    <button class="theme-toggle-fab" @click="toggleTheme" :title="theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'">
+      <el-icon v-if="theme === 'dark'"><Sunny /></el-icon>
+      <el-icon v-else><Moon /></el-icon>
+    </button>
+
     <div class="auth-background">
       <div class="gradient-orb orb-1"></div>
       <div class="gradient-orb orb-2"></div>
@@ -98,12 +103,15 @@
 
 <script setup>
 import { ElMessage } from "element-plus";
-import { User, Lock } from "@element-plus/icons-vue";
+import { User, Lock, Sunny, Moon } from "@element-plus/icons-vue";
 import { reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { useAuthStore } from "../stores/auth";
+import { useTheme } from "../composables/useTheme";
 import { notifyError } from "../utils/error";
+
+const { theme, toggleTheme } = useTheme();
 
 const router = useRouter();
 const route = useRoute();
@@ -145,6 +153,32 @@ async function handleDeveloperEntry() {
 </script>
 
 <style scoped>
+.theme-toggle-fab {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.theme-toggle-fab:hover {
+  background: rgba(255, 107, 53, 0.2);
+  border-color: rgba(255, 107, 53, 0.5);
+  transform: scale(1.1);
+}
+
 .auth-page {
   min-height: 100vh;
   background: linear-gradient(180deg, #0f1419 0%, #1a1f2e 100%);
@@ -154,6 +188,11 @@ async function handleDeveloperEntry() {
   padding: 2rem;
   position: relative;
   overflow: hidden;
+  transition: background 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-page {
+  background: linear-gradient(180deg, #fffbf8 0%, #fff5f0 38%, #ffe8dc 100%);
 }
 
 .auth-background {
@@ -213,6 +252,12 @@ async function handleDeveloperEntry() {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   padding: 3rem;
+  transition: all 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 107, 53, 0.14);
 }
 
 .auth-header {
@@ -245,6 +290,11 @@ async function handleDeveloperEntry() {
   font-size: 1.5rem;
   font-weight: 700;
   color: #ffffff;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .logo-text {
+  color: #1a1f2e;
 }
 
 .auth-title {
@@ -252,11 +302,21 @@ async function handleDeveloperEntry() {
   font-weight: 700;
   color: #ffffff;
   margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-title {
+  color: #1a1f2e;
 }
 
 .auth-description {
   font-size: 1rem;
   color: rgba(255, 255, 255, 0.7);
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-description {
+  color: #53657f;
 }
 
 .auth-alert {
@@ -270,12 +330,23 @@ async function handleDeveloperEntry() {
 .auth-form :deep(.el-form-item__label) {
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-form :deep(.el-form-item__label) {
+  color: #1a1f2e;
 }
 
 .auth-form :deep(.el-input__wrapper) {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: none;
+  transition: all 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-form :deep(.el-input__wrapper) {
+  background: #ffffff;
+  border-color: rgba(255, 107, 53, 0.14);
 }
 
 .auth-form :deep(.el-input__wrapper:hover) {
@@ -289,14 +360,29 @@ async function handleDeveloperEntry() {
 
 .auth-form :deep(.el-input__inner) {
   color: #ffffff;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-form :deep(.el-input__inner) {
+  color: #1a1f2e;
 }
 
 .auth-form :deep(.el-input__inner::placeholder) {
   color: rgba(255, 255, 255, 0.4);
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-form :deep(.el-input__inner::placeholder) {
+  color: rgba(26, 31, 46, 0.4);
 }
 
 .auth-form :deep(.el-input__prefix) {
   color: rgba(255, 255, 255, 0.5);
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-form :deep(.el-input__prefix) {
+  color: rgba(26, 31, 46, 0.5);
 }
 
 .auth-submit {
@@ -318,11 +404,21 @@ async function handleDeveloperEntry() {
   text-align: center;
   padding-top: 1.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-footer {
+  border-top-color: rgba(255, 107, 53, 0.14);
 }
 
 .auth-footer-text {
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.875rem;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-footer-text {
+  color: #53657f;
 }
 
 .auth-footer-link {
@@ -345,6 +441,11 @@ async function handleDeveloperEntry() {
   background: transparent;
   color: rgba(255, 255, 255, 0.5);
   font-size: 0.75rem;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .auth-dev :deep(.el-divider__text) {
+  color: rgba(26, 31, 46, 0.5);
 }
 
 .auth-features {
@@ -361,6 +462,12 @@ async function handleDeveloperEntry() {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+:root[data-theme="light"] .feature-item {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 107, 53, 0.14);
 }
 
 .feature-icon {
@@ -383,11 +490,21 @@ async function handleDeveloperEntry() {
 .feature-text strong {
   color: #ffffff;
   font-size: 1.125rem;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .feature-text strong {
+  color: #1a1f2e;
 }
 
 .feature-text span {
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.875rem;
+  transition: color 0.3s ease;
+}
+
+:root[data-theme="light"] .feature-text span {
+  color: #53657f;
 }
 
 @media (max-width: 768px) {
