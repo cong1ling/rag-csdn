@@ -80,7 +80,7 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-content :deep(p) {
-  margin-bottom: 1em;
+  margin-bottom: 0.4em;
 }
 
 .markdown-content :deep(ul),
