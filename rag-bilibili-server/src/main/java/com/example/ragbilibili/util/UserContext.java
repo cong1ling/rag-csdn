@@ -3,7 +3,9 @@ package com.example.ragbilibili.util;
 /**
  * 用户上下文，基于 ThreadLocal 存储当前请求的用户 ID
  */
-public class UserContext {
+public final class UserContext {
+
+    private UserContext() {}
 
     private static final ThreadLocal<Long> USER_ID = new ThreadLocal<>();
 
