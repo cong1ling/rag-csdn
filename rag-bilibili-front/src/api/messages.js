@@ -1,4 +1,4 @@
-import { http } from "./http";
+import { getToken, http } from "./http";
 import { devServer } from "../mock/dev-server";
 import { resolveApiPath } from "../config/env";
 import { isDeveloperModeEnabled } from "../utils/dev-mode";
@@ -18,12 +18,14 @@ export const messagesApi = {
       return devServer.streamMessage(sessionId, payload, handlers, signal);
     }
     const url = resolveApiPath(`/sessions/${sessionId}/messages/stream`);
+    const token = getToken();
     logger.info("chat", `开始流式请求 ${url}`, payload);
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       credentials: "include",
       body: JSON.stringify(payload),
