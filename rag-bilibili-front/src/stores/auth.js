@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import { authApi } from "../api/auth";
+import { saveToken, removeToken } from "../api/http";
 import {
   DEV_ENTRY_PASSWORD,
   DEV_ENTRY_USERNAME,
@@ -55,7 +56,11 @@ export const useAuthStore = defineStore("auth", () => {
     loading.value = true;
     try {
       disableDeveloperMode();
-      user.value = await authApi.login(payload);
+      const result = await authApi.login(payload);
+      if (result.token) {
+        saveToken(result.token);
+      }
+      user.value = result;
       logger.info("auth", "用户登录成功", user.value);
       return user.value;
     } finally {
@@ -98,6 +103,7 @@ export const useAuthStore = defineStore("auth", () => {
       }
     } finally {
       disableDeveloperMode();
+      removeToken();
       user.value = null;
       initialized.value = true;
       loading.value = false;

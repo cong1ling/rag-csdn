@@ -2,14 +2,17 @@ package com.example.ragbilibili.controller;
 
 import com.example.ragbilibili.dto.request.CreateSessionRequest;
 import com.example.ragbilibili.dto.response.SessionResponse;
+import com.example.ragbilibili.interceptor.LoginInterceptor;
 import com.example.ragbilibili.service.SessionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.ragbilibili.util.UserContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
@@ -34,9 +37,22 @@ class SessionControllerTest {
     @MockBean
     private SessionService sessionService;
 
+    @MockBean
+    private LoginInterceptor loginInterceptor;
+
+    @BeforeEach
+    void mockAuth() throws Exception {
+        UserContext.set(1L);
+        when(loginInterceptor.preHandle(any(), any(), any())).thenReturn(true);
+    }
+
+    @AfterEach
+    void clearAuth() {
+        UserContext.remove();
+    }
+
     @Test
     void testCreateSingleVideoSession() throws Exception {
-        // 准备测试数据 - 单视频会话
         CreateSessionRequest request = new CreateSessionRequest();
         request.setSessionType("SINGLE_VIDEO");
         request.setVideoId(1L);
@@ -47,15 +63,10 @@ class SessionControllerTest {
         response.setVideoId(1L);
         response.setVideoTitle("测试视频");
 
-        // Mock Service 行为
         when(sessionService.createSession(any(CreateSessionRequest.class), eq(1L))).thenReturn(response);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(post("/api/sessions")
-                        .session(session)
+                        .header("Authorization", "Bearer mocked.jwt.token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -67,7 +78,6 @@ class SessionControllerTest {
 
     @Test
     void testCreateAllVideosSession() throws Exception {
-        // 准备测试数据 - 全视频会话
         CreateSessionRequest request = new CreateSessionRequest();
         request.setSessionType("ALL_VIDEOS");
 
@@ -75,15 +85,10 @@ class SessionControllerTest {
         response.setId(2L);
         response.setSessionType("ALL_VIDEOS");
 
-        // Mock Service 行为
         when(sessionService.createSession(any(CreateSessionRequest.class), eq(1L))).thenReturn(response);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(post("/api/sessions")
-                        .session(session)
+                        .header("Authorization", "Bearer mocked.jwt.token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -94,7 +99,6 @@ class SessionControllerTest {
 
     @Test
     void testListSessions() throws Exception {
-        // 准备测试数据
         SessionResponse session1 = new SessionResponse();
         session1.setId(1L);
         session1.setSessionType("SINGLE_VIDEO");
@@ -106,16 +110,10 @@ class SessionControllerTest {
         session2.setSessionType("ALL_VIDEOS");
 
         List<SessionResponse> sessions = Arrays.asList(session1, session2);
-
-        // Mock Service 行为
         when(sessionService.listSessions(1L)).thenReturn(sessions);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(get("/api/sessions")
-                        .session(session))
+                        .header("Authorization", "Bearer mocked.jwt.token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(2))
@@ -125,22 +123,16 @@ class SessionControllerTest {
 
     @Test
     void testGetSession() throws Exception {
-        // 准备测试数据
         SessionResponse response = new SessionResponse();
         response.setId(1L);
         response.setSessionType("SINGLE_VIDEO");
         response.setVideoId(1L);
         response.setVideoTitle("测试视频");
 
-        // Mock Service 行为
         when(sessionService.getSession(1L, 1L)).thenReturn(response);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(get("/api/sessions/1")
-                        .session(session))
+                        .header("Authorization", "Bearer mocked.jwt.token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
@@ -149,15 +141,10 @@ class SessionControllerTest {
 
     @Test
     void testDeleteSession() throws Exception {
-        // Mock Service 行为
         doNothing().when(sessionService).deleteSession(1L, 1L);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(delete("/api/sessions/1")
-                        .session(session))
+                        .header("Authorization", "Bearer mocked.jwt.token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
     }

@@ -2,14 +2,17 @@ package com.example.ragbilibili.controller;
 
 import com.example.ragbilibili.dto.request.ImportVideoRequest;
 import com.example.ragbilibili.dto.response.VideoResponse;
+import com.example.ragbilibili.interceptor.LoginInterceptor;
 import com.example.ragbilibili.service.VideoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.ragbilibili.util.UserContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
@@ -34,9 +37,22 @@ class VideoControllerTest {
     @MockBean
     private VideoService videoService;
 
+    @MockBean
+    private LoginInterceptor loginInterceptor;
+
+    @BeforeEach
+    void mockAuth() throws Exception {
+        UserContext.set(1L);
+        when(loginInterceptor.preHandle(any(), any(), any())).thenReturn(true);
+    }
+
+    @AfterEach
+    void clearAuth() {
+        UserContext.remove();
+    }
+
     @Test
     void testImportVideo() throws Exception {
-        // 准备测试数据
         ImportVideoRequest request = new ImportVideoRequest();
         request.setBvidOrUrl("BV1xx411c7mD");
         request.setSessdata("test_sessdata");
@@ -51,15 +67,10 @@ class VideoControllerTest {
         response.setStatus("SUCCESS");
         response.setChunkCount(10);
 
-        // Mock Service 行为
         when(videoService.importVideo(any(ImportVideoRequest.class), eq(1L))).thenReturn(response);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(post("/api/videos")
-                        .session(session)
+                        .header("Authorization", "Bearer mocked.jwt.token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -72,7 +83,6 @@ class VideoControllerTest {
 
     @Test
     void testListVideos() throws Exception {
-        // 准备测试数据
         VideoResponse video1 = new VideoResponse();
         video1.setId(1L);
         video1.setBvid("BV1xx411c7mD");
@@ -86,16 +96,10 @@ class VideoControllerTest {
         video2.setStatus("SUCCESS");
 
         List<VideoResponse> videos = Arrays.asList(video1, video2);
-
-        // Mock Service 行为
         when(videoService.listVideos(1L)).thenReturn(videos);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(get("/api/videos")
-                        .session(session))
+                        .header("Authorization", "Bearer mocked.jwt.token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(2))
@@ -105,22 +109,16 @@ class VideoControllerTest {
 
     @Test
     void testGetVideo() throws Exception {
-        // 准备测试数据
         VideoResponse response = new VideoResponse();
         response.setId(1L);
         response.setBvid("BV1xx411c7mD");
         response.setTitle("测试视频");
         response.setStatus("SUCCESS");
 
-        // Mock Service 行为
         when(videoService.getVideo(1L, 1L)).thenReturn(response);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(get("/api/videos/1")
-                        .session(session))
+                        .header("Authorization", "Bearer mocked.jwt.token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
@@ -129,15 +127,10 @@ class VideoControllerTest {
 
     @Test
     void testDeleteVideo() throws Exception {
-        // Mock Service 行为
         doNothing().when(videoService).deleteVideo(1L, 1L);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(delete("/api/videos/1")
-                        .session(session))
+                        .header("Authorization", "Bearer mocked.jwt.token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
     }

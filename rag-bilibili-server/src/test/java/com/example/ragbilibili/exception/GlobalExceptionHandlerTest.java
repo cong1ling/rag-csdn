@@ -2,7 +2,9 @@ package com.example.ragbilibili.exception;
 
 import com.example.ragbilibili.controller.AuthController;
 import com.example.ragbilibili.dto.request.RegisterRequest;
+import com.example.ragbilibili.interceptor.LoginInterceptor;
 import com.example.ragbilibili.service.UserService;
+import com.example.ragbilibili.util.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,12 @@ class GlobalExceptionHandlerTest {
 
     @MockBean
     private UserService userService;
+
+    @MockBean
+    private JwtUtil jwtUtil;
+
+    @MockBean
+    private LoginInterceptor loginInterceptor;
 
     @Test
     void testDuplicateKeyExceptionReturnsUserAlreadyExists() throws Exception {
