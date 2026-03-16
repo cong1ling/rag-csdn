@@ -4,10 +4,12 @@ import com.example.ragbilibili.common.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理器
@@ -53,6 +55,14 @@ public class GlobalExceptionHandler {
         }
         logger.warn("参数校验异常: {}", message);
         return Result.error(ErrorCode.PARAM_ERROR.getCode(), message);
+    }
+
+    /**
+     * 处理404资源不存在（静默处理，不打ERROR日志）
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Void> handleNoResource(NoResourceFoundException e) {
+        return ResponseEntity.notFound().build();
     }
 
     /**
