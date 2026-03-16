@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -41,9 +42,9 @@ public class GlobalExceptionHandler {
     /**
      * 处理参数校验异常
      */
-    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class, HttpMessageNotReadableException.class})
     public Result<?> handleValidationException(Exception e) {
-        String message = "参数校验失败";
+        String message = "参数错误";
         if (e instanceof MethodArgumentNotValidException) {
             MethodArgumentNotValidException ex = (MethodArgumentNotValidException) e;
             if (ex.getBindingResult().hasErrors()) {
@@ -54,6 +55,8 @@ public class GlobalExceptionHandler {
             if (ex.getBindingResult().hasErrors()) {
                 message = ex.getBindingResult().getAllErrors().get(0).getDefaultMessage();
             }
+        } else if (e instanceof HttpMessageNotReadableException) {
+            message = "请求体不能为空或格式错误";
         }
         logger.warn("参数校验异常: {}", message);
         return Result.error(ErrorCode.PARAM_ERROR.getCode(), message);
