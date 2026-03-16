@@ -2,21 +2,25 @@ package com.example.ragbilibili.controller;
 
 import com.example.ragbilibili.dto.request.SendMessageRequest;
 import com.example.ragbilibili.dto.response.MessageResponse;
+import com.example.ragbilibili.interceptor.LoginInterceptor;
 import com.example.ragbilibili.service.ChatService;
 import com.example.ragbilibili.service.MessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.ragbilibili.util.UserContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Arrays;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,6 +43,20 @@ class MessageControllerTest {
     @MockBean
     private MessageService messageService;
 
+    @MockBean
+    private LoginInterceptor loginInterceptor;
+
+    @BeforeEach
+    void mockAuth() throws Exception {
+        UserContext.set(1L);
+        when(loginInterceptor.preHandle(any(), any(), any())).thenReturn(true);
+    }
+
+    @AfterEach
+    void clearAuth() {
+        UserContext.remove();
+    }
+
     @Test
     void testStreamMessage() throws Exception {
         SendMessageRequest request = new SendMessageRequest();
@@ -47,11 +65,8 @@ class MessageControllerTest {
         SseEmitter emitter = new SseEmitter();
         when(chatService.streamMessage(eq(1L), eq("什么是 Spring Boot？"), eq(1L))).thenReturn(emitter);
 
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(post("/api/sessions/1/messages/stream")
-                        .session(session)
+                        .header("Authorization", "Bearer mocked.jwt.token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -65,11 +80,8 @@ class MessageControllerTest {
         SendMessageRequest request = new SendMessageRequest();
         request.setContent(" ");
 
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(post("/api/sessions/1/messages/stream")
-                        .session(session)
+                        .header("Authorization", "Bearer mocked.jwt.token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -81,7 +93,6 @@ class MessageControllerTest {
 
     @Test
     void testListMessages() throws Exception {
-        // 准备测试数据
         MessageResponse message1 = new MessageResponse();
         message1.setId(1L);
         message1.setRole("USER");
@@ -93,16 +104,10 @@ class MessageControllerTest {
         message2.setContent("Spring Boot 是一个基于 Spring 框架的快速开发框架...");
 
         List<MessageResponse> messages = Arrays.asList(message1, message2);
-
-        // Mock Service 行为
         when(messageService.listMessages(1L, 1L)).thenReturn(messages);
 
-        // 执行测试
-        MockHttpSession session = new MockHttpSession();
-        session.setAttribute("userId", 1L);
-
         mockMvc.perform(get("/api/sessions/1/messages")
-                        .session(session))
+                        .header("Authorization", "Bearer mocked.jwt.token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(2))

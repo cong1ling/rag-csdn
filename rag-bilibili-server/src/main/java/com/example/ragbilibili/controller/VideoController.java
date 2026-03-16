@@ -4,10 +4,10 @@ import com.example.ragbilibili.common.Result;
 import com.example.ragbilibili.dto.request.ImportVideoRequest;
 import com.example.ragbilibili.dto.response.VideoResponse;
 import com.example.ragbilibili.service.VideoService;
+import com.example.ragbilibili.util.UserContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.util.List;
 
@@ -21,36 +21,23 @@ public class VideoController {
     private VideoService videoService;
 
     @PostMapping
-    public Result<VideoResponse> importVideo(
-            @Valid @RequestBody ImportVideoRequest request,
-            HttpSession session) {
-        Long userId = (Long) session.getAttribute("userId");
-        VideoResponse response = videoService.importVideo(request, userId);
-        return Result.success(response);
+    public Result<VideoResponse> importVideo(@Valid @RequestBody ImportVideoRequest request) {
+        return Result.success(videoService.importVideo(request, UserContext.get()));
     }
 
     @GetMapping
-    public Result<List<VideoResponse>> listVideos(HttpSession session) {
-        Long userId = (Long) session.getAttribute("userId");
-        List<VideoResponse> videos = videoService.listVideos(userId);
-        return Result.success(videos);
+    public Result<List<VideoResponse>> listVideos() {
+        return Result.success(videoService.listVideos(UserContext.get()));
     }
 
     @GetMapping("/{id}")
-    public Result<VideoResponse> getVideo(
-            @PathVariable Long id,
-            HttpSession session) {
-        Long userId = (Long) session.getAttribute("userId");
-        VideoResponse response = videoService.getVideo(id, userId);
-        return Result.success(response);
+    public Result<VideoResponse> getVideo(@PathVariable Long id) {
+        return Result.success(videoService.getVideo(id, UserContext.get()));
     }
 
     @DeleteMapping("/{id}")
-    public Result<Void> deleteVideo(
-            @PathVariable Long id,
-            HttpSession session) {
-        Long userId = (Long) session.getAttribute("userId");
-        videoService.deleteVideo(id, userId);
+    public Result<Void> deleteVideo(@PathVariable Long id) {
+        videoService.deleteVideo(id, UserContext.get());
         return Result.success();
     }
 }

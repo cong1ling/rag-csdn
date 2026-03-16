@@ -6,13 +6,30 @@ import { normalizeError } from "../utils/error";
 import { isDeveloperModeEnabled } from "../utils/dev-mode";
 import { logger, sanitizeForLog } from "../utils/logger";
 
+const TOKEN_KEY = "rag_token";
+
+export function saveToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function removeToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 export const http = axios.create({
   baseURL: apiBaseUrl || "/",
-  withCredentials: true,
   timeout: 20000,
 });
 
 http.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers["Authorization"] = `Bearer ${token}`;
+  }
   logger.info("http", `请求 ${String(config.method || "GET").toUpperCase()} ${config.url}`, {
     params: sanitizeForLog(config.params),
     data: sanitizeForLog(config.data),
@@ -52,6 +69,7 @@ http.interceptors.response.use(
       currentPath !== "/login" &&
       currentPath !== "/register"
     ) {
+      removeToken();
       const redirect = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
       window.location.assign(`/login?redirect=${redirect}`);
     }
