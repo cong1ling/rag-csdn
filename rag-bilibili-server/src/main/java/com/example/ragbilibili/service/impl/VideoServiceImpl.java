@@ -56,6 +56,9 @@ public class VideoServiceImpl implements VideoService {
     @Autowired
     private DashVectorStore dashVectorStore;
 
+    @Autowired
+    private VideoStatusWriter videoStatusWriter;
+
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
@@ -174,10 +177,8 @@ public class VideoServiceImpl implements VideoService {
             log.error("视频导入失败: userId={}, bvid={}", userId, bvid, e);
 
             if (video != null) {
-                // 更新视频状态为失败
-                video.setStatus(VideoStatus.FAILED.getCode());
-                video.setFailReason(e.getMessage());
-                videoMapper.update(video);
+                // 用独立事务写入失败状态，防止被外层事务回滚
+                videoStatusWriter.markFailed(video, e.getMessage());
             }
 
             throw new BusinessException(ErrorCode.VIDEO_IMPORT_FAILED);
