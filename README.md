@@ -1,5 +1,5 @@
-# RAG-Bilibili
-
+[![Java CI with Maven](https://github.com/zshs000/rag-bilibili/actions/workflows/maven.yml/badge.svg)](https://github.com/zshs000/rag-bilibili/actions/workflows/maven.yml)    [![Node.js CI](https://github.com/zshs000/rag-bilibili/actions/workflows/node.js.yml/badge.svg)](https://github.com/zshs000/rag-bilibili/actions/workflows/node.js.yml)
+# rag-bilibili
 基于 B 站视频字幕内容构建的检索增强问答系统。项目支持导入单个 Bilibili 视频，将字幕切分、向量化并写入知识库，再通过大模型结合检索结果进行流式问答。
 
 当前仓库采用前后端分离结构：
