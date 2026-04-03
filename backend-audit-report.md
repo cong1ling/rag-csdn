@@ -127,7 +127,6 @@
 **建议**：生产环境注释掉或使用 profile 区分：
 ```yaml
 # 开发环境
-spring.profiles: dev
 mybatis.configuration.log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 # 生产环境
