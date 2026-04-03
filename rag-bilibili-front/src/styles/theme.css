@@ -20,6 +20,7 @@
   --rb-panel: #18181B;
   --rb-panel-strong: #1C1C1E;
   --rb-border: #27272A;
+  --rb-border-hover: #3F3F46;
 
   /* Typography */
   --rb-text: #F9FAFB;
@@ -102,6 +103,7 @@
   --rb-panel: #ffffff;
   --rb-panel-strong: #ffffff;
   --rb-border: #dbeafe;
+  --rb-border-hover: #93c5fd;
 
   --rb-text: #1e3a8a;
   --rb-text-soft: #60a5fa;

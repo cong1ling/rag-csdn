@@ -593,7 +593,7 @@ async function sendMessage() {
   padding: 10px 14px;
   background: var(--rb-panel);
   border-radius: var(--rb-radius-sm);
-  border-left: 2px solid var(--rb-border-hover);
+  border-left: 2px solid var(--rb-border-hover, var(--rb-border));
   color: var(--rb-text-muted);
   line-height: 1.5;
 }

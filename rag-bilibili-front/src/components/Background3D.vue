@@ -9,7 +9,12 @@
 
     <!-- Layer 1: Data Stream (Scrolling Hex) -->
     <div class="data-stream-layer">
-      <div v-for="i in 8" :key="'col-'+i" class="data-column" :style="{ '--delay': (i * -2) + 's', '--left': (i * 12) + '%' }">
+      <div
+        v-for="i in 8"
+        :key="'col-'+i"
+        class="data-column"
+        :style="{ left: (i * 12) + '%', animationDelay: (i * -2) + 's' }"
+      >
         <span v-for="j in 20" :key="'char-'+j">{{ generateHex() }}</span>
       </div>
     </div>
@@ -22,7 +27,12 @@
       <!-- Neural Node Cluster (Top Left) -->
       <div class="geo geo-nodes-wrapper">
         <div class="nodes-core">
-          <div v-for="i in 6" :key="'node-'+i" class="node" :style="{ '--idx': i }"></div>
+          <div
+            v-for="i in 6"
+            :key="'node-'+i"
+            class="node"
+            :style="{ transform: `rotateY(${i * 60}deg) rotateX(${i * 45}deg) translateZ(80px)` }"
+          ></div>
           <div class="node-lines"></div>
         </div>
       </div>
@@ -47,7 +57,12 @@
       <!-- 3D Data Ring / Torus (Left Center) -->
       <div class="geo geo-ring-wrapper">
         <div class="ring-3d">
-          <div v-for="i in 3" :key="'ring-'+i" class="ring-layer" :style="{ '--ridx': i }"></div>
+          <div
+            v-for="i in 3"
+            :key="'ring-'+i"
+            class="ring-layer"
+            :style="{ transform: `rotateX(${i * 45}deg) rotateY(${i * 30}deg)` }"
+          ></div>
         </div>
       </div>
 
@@ -63,7 +78,12 @@
       <!-- DNA Double Helix (Bottom Right) -->
       <div class="geo geo-dna-wrapper">
         <div class="dna-3d">
-          <div v-for="i in 12" :key="i" class="dna-unit" :style="{ '--idx': i }">
+          <div
+            v-for="i in 12"
+            :key="i"
+            class="dna-unit"
+            :style="{ top: (i * 20) + 'px', transform: `rotateY(${i * 30}deg)` }"
+          >
             <span class="dot dot1"></span>
             <span class="bar"></span>
             <span class="dot dot2"></span>
@@ -114,19 +134,17 @@ function generateHex() {
   inset: 0;
   z-index: 1;
   opacity: 0.04;
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), monospace;
   font-size: 12px;
   overflow: hidden;
 }
 .data-column {
   position: absolute;
   top: -100px;
-  left: var(--left);
   display: flex;
   flex-direction: column;
   gap: 10px;
   animation: stream-down 15s linear infinite;
-  animation-delay: var(--delay);
 }
 @keyframes stream-down {
   from { transform: translateY(0); }
@@ -180,10 +198,6 @@ function generateHex() {
   border-radius: 50%;
   box-shadow: 0 0 15px var(--rb-accent);
   top: 50%; left: 50%;
-  transform: 
-    rotateY(calc(var(--idx) * 60deg)) 
-    rotateX(calc(var(--idx) * 45deg)) 
-    translateZ(80px);
 }
 
 /* Sphere (Earth) */
@@ -258,7 +272,6 @@ function generateHex() {
   border: 2px solid var(--rb-accent);
   border-radius: 50%;
   opacity: 0.3;
-  transform: rotateX(calc(var(--ridx) * 45deg)) rotateY(calc(var(--ridx) * 30deg));
   box-shadow: 0 0 20px var(--rb-accent-soft);
 }
 
@@ -307,9 +320,7 @@ function generateHex() {
   position: absolute;
   width: 100%;
   height: 18px;
-  top: calc(var(--idx) * 20px);
   transform-style: preserve-3d;
-  transform: rotateY(calc(var(--idx) * 30deg));
   display: flex; align-items: center; justify-content: center;
 }
 .dna-unit .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rb-accent); box-shadow: 0 0 10px var(--rb-accent); }
