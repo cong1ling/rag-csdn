@@ -59,9 +59,12 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(BusinessException e) {
+        ErrorCode ec = e.getErrorCode();
+        int httpStatus = ec != null ? ec.getHttpStatus() : 500;
+        int code = ec != null ? ec.getCode() : e.getCode();
         return ResponseEntity
-                .status(e.getErrorCode().getHttpStatus())
-                .body(Result.error(e.getErrorCode().getCode(), e.getMessage()));
+                .status(httpStatus)
+                .body(Result.error(code, e.getMessage()));
     }
 
     /**
