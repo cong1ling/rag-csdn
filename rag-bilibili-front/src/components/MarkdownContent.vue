@@ -1,5 +1,5 @@
 <template>
-  <div class="markdown-content" v-html="renderedHtml"></div>
+  <div class="markdown-content" :class="{ 'is-streaming': streaming }" v-html="renderedHtml"></div>
 </template>
 
 <script setup>
@@ -12,6 +12,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  streaming: {
+    type: Boolean,
+    default: false,
+  }
 });
 
 // 配置marked
@@ -50,6 +54,8 @@ const renderedHtml = computed(() => {
 .markdown-content {
   line-height: 1.6;
   word-wrap: break-word;
+  color: var(--rb-text);
+  font-size: 0.95rem;
 }
 
 .markdown-content :deep(h1),
@@ -61,32 +67,39 @@ const renderedHtml = computed(() => {
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: 600;
+  color: var(--rb-text);
+  line-height: 1.3;
 }
 
 .markdown-content :deep(h1) {
-  font-size: 1.8em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--rb-border);
   padding-bottom: 0.3em;
 }
 
 .markdown-content :deep(h2) {
-  font-size: 1.5em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 1.25em;
+  border-bottom: 1px solid var(--rb-border);
   padding-bottom: 0.3em;
 }
 
 .markdown-content :deep(h3) {
-  font-size: 1.3em;
+  font-size: 1.1em;
 }
 
 .markdown-content :deep(p) {
-  margin-bottom: 0.4em;
+  margin-bottom: 0.8em;
+  margin-top: 0;
+}
+
+.markdown-content :deep(p:last-child) {
+  margin-bottom: 0;
 }
 
 .markdown-content :deep(ul),
 .markdown-content :deep(ol) {
   margin-bottom: 1em;
-  padding-left: 2em;
+  padding-left: 1.5em;
 }
 
 .markdown-content :deep(li) {
@@ -94,19 +107,20 @@ const renderedHtml = computed(() => {
 }
 
 .markdown-content :deep(code) {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--rb-panel-strong);
   padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  font-size: 0.9em;
-  color: #ff6b35;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85em;
+  color: var(--rb-text);
+  border: 1px solid var(--rb-border);
 }
 
 .markdown-content :deep(pre) {
-  background-color: rgba(26, 31, 46, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--rb-panel-strong);
+  border: 1px solid var(--rb-border);
   padding: 1em;
-  border-radius: 5px;
+  border-radius: var(--rb-radius-md);
   overflow-x: auto;
   margin-bottom: 1em;
 }
@@ -114,18 +128,25 @@ const renderedHtml = computed(() => {
 .markdown-content :deep(pre code) {
   background-color: transparent;
   padding: 0;
+  border: none;
+  color: var(--rb-text);
+  font-size: 0.85rem;
 }
 
 .markdown-content :deep(blockquote) {
-  border-left: 4px solid rgba(255, 107, 53, 0.5);
+  border-left: 4px solid var(--rb-border-hover);
   padding-left: 1em;
   margin-left: 0;
-  color: rgba(255, 255, 255, 0.6);
+  margin-right: 0;
+  color: var(--rb-text-muted);
   margin-bottom: 1em;
+  background: var(--rb-panel);
+  padding: 12px 16px;
+  border-radius: 0 var(--rb-radius-md) var(--rb-radius-md) 0;
 }
 
 .markdown-content :deep(a) {
-  color: #4a90e2;
+  color: #3b82f6;
   text-decoration: none;
 }
 
@@ -141,58 +162,41 @@ const renderedHtml = computed(() => {
 
 .markdown-content :deep(th),
 .markdown-content :deep(td) {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 0.5em;
+  border: 1px solid var(--rb-border);
+  padding: 0.5em 1em;
   text-align: left;
 }
 
 .markdown-content :deep(th) {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--rb-panel);
   font-weight: 600;
 }
 
 .markdown-content :deep(img) {
   max-width: 100%;
   height: auto;
+  border-radius: var(--rb-radius-md);
+  border: 1px solid var(--rb-border);
 }
 
 .markdown-content :deep(hr) {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid var(--rb-border);
   margin: 1.5em 0;
 }
 
-/* Light Theme Overrides */
-:root[data-theme="light"] .markdown-content :deep(h1),
-:root[data-theme="light"] .markdown-content :deep(h2) {
-  border-bottom-color: #e5e7eb;
+/* Streaming Animation */
+.is-streaming::after {
+  content: '▋';
+  display: inline-block;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+  color: var(--rb-text);
+  margin-left: 4px;
 }
 
-:root[data-theme="light"] .markdown-content :deep(code) {
-  background-color: #f3f4f6;
-  color: #ff6b35;
-}
-
-:root[data-theme="light"] .markdown-content :deep(pre) {
-  background-color: #f3f4f6;
-  border-color: #e5e7eb;
-}
-
-:root[data-theme="light"] .markdown-content :deep(blockquote) {
-  border-left-color: #e5e7eb;
-  color: #6b7280;
-}
-
-:root[data-theme="light"] .markdown-content :deep(th),
-:root[data-theme="light"] .markdown-content :deep(td) {
-  border-color: #e5e7eb;
-}
-
-:root[data-theme="light"] .markdown-content :deep(th) {
-  background-color: #f3f4f6;
-}
-
-:root[data-theme="light"] .markdown-content :deep(hr) {
-  border-top-color: #e5e7eb;
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 </style>

@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +61,10 @@ public class VideoServiceImpl implements VideoService {
     @Autowired
     private VideoStatusWriter videoStatusWriter;
 
+    @Autowired
+    @Qualifier("taskExecutor")
+    private TaskExecutor taskExecutor;
+
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
@@ -73,10 +79,30 @@ public class VideoServiceImpl implements VideoService {
             throw new BusinessException(ErrorCode.VIDEO_ALREADY_EXISTS);
         }
 
-        Video video = null;
+        // 3. 同步创建 IMPORTING 状态的视频记录，立即返回给前端
+        Video video = new Video();
+        video.setUserId(userId);
+        video.setBvid(bvid);
+        video.setTitle("导入中...");
+        video.setStatus(VideoStatus.IMPORTING.getCode());
+        video.setImportTime(LocalDateTime.now());
+        videoMapper.insert(video);
 
+        Long videoId = video.getId();
+
+        // 4. 提交异步任务：拉取字幕、切分、向量化
+        taskExecutor.execute(() -> executeImport(videoId, userId, bvid, request));
+
+        return convertToResponse(video);
+    }
+
+    /**
+     * 异步执行实际的导入流程。
+     * 在独立线程中运行，不占用 HTTP 请求线程。
+     */
+    private void executeImport(Long videoId, Long userId, String bvid, ImportVideoRequest request) {
         try {
-            // 3. 使用 BilibiliDocumentReader 读取视频内容
+            // 1. 使用 BilibiliDocumentReader 读取视频内容
             BilibiliCredentials credentials = BilibiliCredentials.builder()
                     .sessdata(request.getSessdata())
                     .biliJct(request.getBiliJct())
@@ -87,30 +113,20 @@ public class VideoServiceImpl implements VideoService {
             List<Document> documents = reader.get();
 
             if (documents.isEmpty()) {
-                throw new BusinessException(ErrorCode.VIDEO_NO_SUBTITLE);
+                markVideoFailed(videoId, "视频无字幕或字幕为空");
+                return;
             }
 
             Document document = documents.get(0);
             String videoTitle = (String) document.getMetadata().get("title");
             String videoDescription = (String) document.getMetadata().get("description");
 
-            // 4. 创建视频记录（状态：IMPORTING）
-            video = new Video();
-            video.setUserId(userId);
-            video.setBvid(bvid);
-            video.setTitle(videoTitle);
-            video.setDescription(videoDescription);
-            video.setStatus(VideoStatus.IMPORTING.getCode());
-            video.setImportTime(LocalDateTime.now());
-            videoMapper.insert(video);
-
-            // 5. 文本切分
+            // 2. 文本切分
             List<Document> splitDocuments = tokenTextSplitter.apply(documents);
             List<Document> indexedDocuments = new ArrayList<>(splitDocuments.size());
 
-            // 6. 生成向量ID并准备数据
+            // 3. 生成向量ID并准备数据
             List<Chunk> chunks = new ArrayList<>();
-            List<VectorMapping> mappings = new ArrayList<>();
             int totalChunks = splitDocuments.size();
 
             for (int i = 0; i < splitDocuments.size(); i++) {
@@ -127,9 +143,8 @@ public class VideoServiceImpl implements VideoService {
                         .build();
                 indexedDocuments.add(indexedDocument);
 
-                // 创建分片记录
                 Chunk chunk = new Chunk();
-                chunk.setVideoId(video.getId());
+                chunk.setVideoId(videoId);
                 chunk.setUserId(userId);
                 chunk.setBvid(bvid);
                 chunk.setTitle(videoTitle);
@@ -140,34 +155,37 @@ public class VideoServiceImpl implements VideoService {
                 chunks.add(chunk);
             }
 
-            // 7. 批量插入分片
+            // 4. 批量插入分片
             if (!chunks.isEmpty()) {
                 chunkMapper.batchInsert(chunks);
             }
 
-            // 8. 写入 DashVector
+            // 5. 写入 DashVector
             dashVectorStore.add(indexedDocuments);
 
-            // 9. 创建向量映射
+            // 6. 创建向量映射
+            List<VectorMapping> mappings = new ArrayList<>();
             for (int i = 0; i < chunks.size(); i++) {
                 Chunk chunk = chunks.get(i);
                 String vectorId = VectorIDGenerator.generate(userId, bvid, i);
 
                 VectorMapping mapping = new VectorMapping();
                 mapping.setUserId(userId);
-                mapping.setVideoId(video.getId());
+                mapping.setVideoId(videoId);
                 mapping.setChunkId(chunk.getId());
                 mapping.setVectorId(vectorId);
                 mapping.setCreateTime(LocalDateTime.now());
                 mappings.add(mapping);
             }
 
-            // 10. 批量插入向量映射
             if (!mappings.isEmpty()) {
                 vectorMappingMapper.batchInsert(mappings);
             }
 
-            // 11. 更新视频状态为成功
+            // 7. 更新视频状态为成功
+            Video video = videoMapper.selectById(videoId);
+            video.setTitle(videoTitle);
+            video.setDescription(videoDescription);
             video.setStatus(VideoStatus.SUCCESS.getCode());
             videoMapper.update(video);
 
@@ -175,16 +193,15 @@ public class VideoServiceImpl implements VideoService {
 
         } catch (Exception e) {
             log.error("视频导入失败: userId={}, bvid={}", userId, bvid, e);
-
-            if (video != null) {
-                // 用独立事务写入失败状态，防止被外层事务回滚
-                videoStatusWriter.markFailed(video, e.getMessage());
-            }
-
-            throw new BusinessException(ErrorCode.VIDEO_IMPORT_FAILED);
+            markVideoFailed(videoId, e.getMessage());
         }
+    }
 
-        return convertToResponse(video);
+    private void markVideoFailed(Long videoId, String reason) {
+        Video video = videoMapper.selectById(videoId);
+        if (video != null) {
+            videoStatusWriter.markFailed(video, reason);
+        }
     }
 
     @Override

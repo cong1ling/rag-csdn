@@ -1,80 +1,79 @@
 <template>
   <div class="app-shell">
-    <aside class="app-sidebar">
-      <RouterLink to="/" class="nav-brand">
-        <div class="nav-mark">RB</div>
-        <div class="nav-brand-text">
-          <strong>RAG Bilibili</strong>
-          <div class="nav-brand-subtitle">Video Knowledge</div>
-        </div>
-      </RouterLink>
-
-      <div class="user-card">
-        <div class="user-avatar">
-          {{ (authStore.user?.username || "U")[0].toUpperCase() }}
-        </div>
-        <div class="user-info">
-          <strong class="user-name">{{ authStore.user?.username || "未登录" }}</strong>
-          <span class="user-status">
-            {{ authStore.isDeveloperMode ? "开发模式" : "已登录" }}
-          </span>
-        </div>
-      </div>
-
-      <nav class="nav-links">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.name"
-          class="nav-link"
-          :to="{ name: item.name }"
-        >
-          <el-icon class="nav-icon"><component :is="item.icon" /></el-icon>
-          <span class="nav-label">{{ item.label }}</span>
+    <div class="app-layout">
+      <!-- Solid Sidebar -->
+      <aside class="app-sidebar">
+        <RouterLink to="/" class="nav-brand">
+          <div class="nav-mark">RB</div>
+          <div class="nav-brand-text">
+            <strong>RAG Bilibili</strong>
+            <div class="nav-brand-subtitle">Enterprise Workspace</div>
+          </div>
         </RouterLink>
-      </nav>
 
-      <div class="nav-footer">
-        <button class="theme-toggle-button" @click="toggleTheme">
-          <el-icon v-if="theme === 'dark'"><Sunny /></el-icon>
-          <el-icon v-else><Moon /></el-icon>
-          <span>{{ theme === 'dark' ? '浅色模式' : '深色模式' }}</span>
-        </button>
-        <button class="logout-button" @click="handleLogout">
-          <el-icon><SwitchButton /></el-icon>
-          <span>退出登录</span>
-        </button>
-      </div>
-    </aside>
-
-    <main class="app-main">
-      <div class="main-background">
-        <div class="gradient-orb orb-1"></div>
-        <div class="gradient-orb orb-2"></div>
-      </div>
-
-      <header class="page-header">
-        <div class="header-content">
-          <div class="header-text">
-            <div class="header-eyebrow">{{ eyebrow }}</div>
-            <h1 class="header-title">{{ title }}</h1>
-            <p class="header-subtitle">{{ subtitle }}</p>
+        <div class="user-card">
+          <div class="user-avatar">
+            {{ (authStore.user?.username || "U")[0].toUpperCase() }}
           </div>
-          <div class="header-actions">
-            <slot name="header-actions" />
+          <div class="user-info">
+            <strong class="user-name">{{ authStore.user?.username || "未登录" }}</strong>
+            <span class="user-status">
+              {{ authStore.isDeveloperMode ? "开发模式" : "已登录" }}
+            </span>
           </div>
         </div>
-      </header>
 
-      <div class="page-content">
-        <slot />
-      </div>
-    </main>
+        <nav class="nav-links">
+          <RouterLink
+            v-for="item in navItems"
+            :key="item.name"
+            class="nav-link"
+            :to="{ name: item.name }"
+          >
+            <el-icon class="nav-icon"><component :is="item.icon" /></el-icon>
+            <span class="nav-label">{{ item.label }}</span>
+          </RouterLink>
+        </nav>
+
+        <div class="nav-footer">
+          <button class="theme-toggle-button" @click="toggleTheme">
+            <el-icon v-if="theme === 'dark'"><Sunny /></el-icon>
+            <el-icon v-else><Moon /></el-icon>
+            <span>{{ theme === 'dark' ? '浅色模式' : '深色模式' }}</span>
+          </button>
+          <button class="logout-button" @click="handleLogout">
+            <el-icon><SwitchButton /></el-icon>
+            <span>退出登录</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="app-main">
+        <header class="page-header">
+          <div class="header-content">
+            <div class="header-text">
+              <div class="eyebrow">{{ eyebrow }}</div>
+              <h1 class="page-title">{{ title }}</h1>
+              <p class="page-subtitle">{{ subtitle }}</p>
+            </div>
+            <div class="header-actions">
+              <slot name="header-actions" />
+            </div>
+          </div>
+        </header>
+
+        <div class="page-content">
+          <slot />
+        </div>
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ChatDotRound, Collection, Download, SwitchButton, Sunny, Moon } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { RouterLink, useRouter } from "vue-router";
 
 import { useAuthStore } from "../stores/auth";
@@ -109,6 +108,15 @@ const navItems = [
 
 async function handleLogout() {
   try {
+    await ElMessageBox.confirm("确定要退出登录吗？", "退出确认", {
+      confirmButtonText: "退出",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  try {
     await authStore.logout();
     ElMessage.success("已退出登录");
     await router.push({ name: "login" });
@@ -120,107 +128,91 @@ async function handleLogout() {
 
 <style scoped>
 .app-shell {
-  display: flex;
   min-height: 100vh;
-  background: #0f1419;
+  background-color: var(--rb-bg);
 }
 
-:root[data-theme="light"] .app-shell {
-  background: #ffffff;
+/* Layout */
+.app-layout {
+  display: grid;
+  grid-template-columns: var(--rb-sidebar) minmax(0, 1fr);
+  min-height: 100vh;
 }
 
 /* Sidebar */
 .app-sidebar {
-  width: 280px;
-  background: rgba(26, 31, 46, 0.8);
-  backdrop-filter: blur(20px);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
+  height: 100vh;
   position: sticky;
   top: 0;
-  height: 100vh;
-  overflow-y: auto;
-  transition: all 0.3s ease;
+  padding: 32px 24px;
+  background-color: var(--rb-panel);
+  border-right: 1px solid var(--rb-border);
+  z-index: 20;
 }
 
-:root[data-theme="light"] .app-sidebar {
-  background: rgba(255, 255, 255, 0.9);
-  border-right-color: rgba(255, 107, 53, 0.14);
-}
-
+/* Sidebar Branding */
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-  text-decoration: none;
-  padding: 0.75rem;
-  border-radius: 12px;
-  transition: background 0.3s ease;
+  gap: 12px;
+  margin-bottom: 40px;
+  transition: opacity 0.2s ease;
+  padding: 0 8px;
 }
 
 .nav-brand:hover {
-  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.8;
 }
 
 .nav-mark {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-  border-radius: 12px;
+  background: var(--rb-accent);
+  border-radius: var(--rb-radius-md);
+  font-family: var(--font-heading);
   font-weight: 700;
   font-size: 1.25rem;
-  color: #ffffff;
-  flex-shrink: 0;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(var(--rb-accent-rgb), 0.2);
 }
 
 .nav-brand-text {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
 }
 
 .nav-brand-text strong {
-  color: #ffffff;
-  font-size: 1.125rem;
-  font-weight: 600;
-  transition: color 0.3s ease;
-}
-
-:root[data-theme="light"] .nav-brand-text strong {
-  color: #1a1f2e;
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--rb-text);
+  line-height: 1.2;
 }
 
 .nav-brand-subtitle {
-  color: rgba(255, 255, 255, 0.5);
   font-size: 0.75rem;
-  transition: color 0.3s ease;
+  color: var(--rb-text-soft);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-:root[data-theme="light"] .nav-brand-subtitle {
-  color: #53657f;
-}
-
+/* User Card */
 .user-card {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  transition: all 0.3s ease;
-}
-
-:root[data-theme="light"] .user-card {
-  background: rgba(255, 107, 53, 0.08);
-  border-color: rgba(255, 107, 53, 0.14);
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 40px;
+  background: var(--rb-bg-strong);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
 }
 
 .user-avatar {
@@ -229,379 +221,211 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+  background: var(--rb-accent-soft);
+  color: var(--rb-accent);
   border-radius: 50%;
-  font-weight: 600;
-  color: #ffffff;
-  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 1rem;
 }
 
 .user-info {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
 }
 
 .user-name {
-  color: #ffffff;
   font-size: 0.875rem;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.3s ease;
-}
-
-:root[data-theme="light"] .user-name {
-  color: #1a1f2e;
 }
 
 .user-status {
-  color: rgba(255, 255, 255, 0.5);
   font-size: 0.75rem;
-  transition: color 0.3s ease;
+  color: var(--rb-success);
 }
 
-:root[data-theme="light"] .user-status {
-  color: #53657f;
+/* Sidebar Action */
+.sidebar-action {
+  margin-bottom: 24px;
 }
 
+.btn-block {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--rb-radius-md);
+  font-weight: 700;
+  gap: 12px;
+  background: var(--rb-accent);
+  color: #fff;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(var(--rb-accent-rgb), 0.2);
+  transition: all 0.2s;
+}
+
+.btn-block:hover {
+  background: var(--rb-accent-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(var(--rb-accent-rgb), 0.3);
+}
+
+/* Navigation */
 .nav-links {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 4px;
   flex: 1;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem 1rem;
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  font-size: 0.9375rem;
-}
-
-:root[data-theme="light"] .nav-link {
-  color: #53657f;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--rb-radius-md);
+  color: var(--rb-text-soft);
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.95rem;
+  margin-bottom: 2px;
 }
 
 .nav-link:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
-}
-
-:root[data-theme="light"] .nav-link:hover {
-  background: rgba(255, 107, 53, 0.08);
-  color: #1a1f2e;
+  background: var(--rb-bg-strong);
+  color: var(--rb-text);
+  transform: translateX(4px);
 }
 
 .nav-link.router-link-active {
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(247, 147, 30, 0.15) 100%);
-  border: 1px solid rgba(255, 107, 53, 0.3);
-  color: #ff6b35;
-}
-
-:root[data-theme="light"] .nav-link.router-link-active {
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.12) 0%, rgba(247, 147, 30, 0.12) 100%);
-  border-color: rgba(255, 107, 53, 0.3);
+  background: var(--rb-accent);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(var(--rb-accent-rgb), 0.25);
 }
 
 .nav-icon {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
 }
 
-.nav-label {
-  font-weight: 500;
-}
-
+/* Footer Actions */
 .nav-footer {
   margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  transition: border-color 0.3s ease;
+  gap: 8px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rb-border);
 }
 
-:root[data-theme="light"] .nav-footer {
-  border-top-color: rgba(255, 107, 53, 0.14);
-}
-
-.theme-toggle-button {
-  width: 100%;
+.theme-toggle-button, .logout-button {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.875rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.9375rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-:root[data-theme="light"] .theme-toggle-button {
-  background: rgba(255, 107, 53, 0.05);
-  border-color: rgba(255, 107, 53, 0.14);
-  color: #53657f;
-}
-
-.theme-toggle-button:hover {
-  background: rgba(255, 107, 53, 0.1);
-  border-color: rgba(255, 107, 53, 0.3);
-  color: #ff6b35;
-}
-
-:root[data-theme="light"] .theme-toggle-button:hover {
-  background: rgba(255, 107, 53, 0.12);
-  color: #ff6b35;
-}
-
-.logout-button {
+  justify-content: flex-start;
+  gap: 12px;
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.875rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.9375rem;
+  padding: 10px 14px;
+  border-radius: var(--rb-radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--rb-text-soft);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
 }
 
-:root[data-theme="light"] .logout-button {
-  background: rgba(255, 107, 53, 0.05);
-  border-color: rgba(255, 107, 53, 0.14);
-  color: #53657f;
+.theme-toggle-button:hover, .logout-button:hover {
+  background: var(--el-fill-color-light);
+  color: var(--rb-text);
 }
 
 .logout-button:hover {
-  background: rgba(255, 107, 53, 0.1);
-  border-color: rgba(255, 107, 53, 0.3);
-  color: #ff6b35;
+  color: var(--rb-danger);
+  background: rgba(239, 68, 68, 0.1);
 }
 
-:root[data-theme="light"] .logout-button:hover {
-  background: rgba(255, 107, 53, 0.12);
-  color: #ff6b35;
-}
-
-/* Main Content */
+/* Main Content Area */
 .app-main {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  position: relative;
-  overflow: hidden;
-}
-
-.main-background {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.15;
-  animation: float 25s ease-in-out infinite;
-  transition: opacity 0.3s ease;
-}
-
-:root[data-theme="light"] .gradient-orb {
-  opacity: 0.08;
-}
-
-.orb-1 {
-  width: 600px;
-  height: 600px;
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-  top: -200px;
-  right: -200px;
-}
-
-.orb-2 {
-  width: 500px;
-  height: 500px;
-  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-  bottom: -150px;
-  left: 50%;
-  animation-delay: 10s;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(50px, -50px) scale(1.1);
-  }
-  66% {
-    transform: translate(-30px, 30px) scale(0.9);
-  }
+  min-height: 100vh;
+  background-color: var(--rb-bg);
+  overflow-x: hidden;
 }
 
 .page-header {
+  padding: 32px 40px;
+  background-color: var(--rb-panel);
+  border-bottom: 1px solid var(--rb-border);
+  backdrop-filter: blur(8px);
   position: relative;
-  z-index: 1;
-  padding: 2rem 3rem;
-  background: rgba(26, 31, 46, 0.6);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-}
-
-:root[data-theme="light"] .page-header {
-  background: rgba(255, 255, 255, 0.7);
-  border-bottom-color: rgba(255, 107, 53, 0.14);
+  z-index: 10;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 2rem;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .header-text {
   flex: 1;
 }
 
-.header-eyebrow {
-  display: inline-block;
-  padding: 0.375rem 0.75rem;
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px solid rgba(255, 107, 53, 0.3);
-  border-radius: 50px;
-  font-size: 0.75rem;
-  color: #ff6b35;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 1rem;
-}
-
-.header-title {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #ffffff;
-  margin-bottom: 0.5rem;
-  line-height: 1.2;
-  transition: color 0.3s ease;
-}
-
-:root[data-theme="light"] .header-title {
-  color: #1a1f2e;
-}
-
-.header-subtitle {
-  font-size: 1.125rem;
-  color: rgba(255, 255, 255, 0.7);
-  line-height: 1.5;
-  max-width: 600px;
-  transition: color 0.3s ease;
-}
-
-:root[data-theme="light"] .header-subtitle {
-  color: #53657f;
-}
-
 .header-actions {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
+  gap: 12px;
 }
 
 .page-content {
-  position: relative;
-  z-index: 1;
   flex: 1;
-  padding: 2rem 3rem;
-  overflow-y: auto;
-  background: transparent;
-  transition: background-color 0.3s ease;
+  padding: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-:root[data-theme="light"] .page-content {
-  background: transparent;
-}
-
-/* Element Plus Overrides */
-.page-content :deep(.el-button--primary) {
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-  border: none;
-}
-
-.page-content :deep(.el-button--primary:hover) {
-  background: linear-gradient(135deg, #ff7a45 0%, #ffa02e 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(255, 107, 53, 0.3);
-}
-
-/* Responsive */
+/* Responsive Design */
 @media (max-width: 1024px) {
-  .app-sidebar {
-    width: 240px;
-  }
-
-  .page-header {
-    padding: 1.5rem 2rem;
-  }
-
-  .page-content {
-    padding: 1.5rem 2rem;
-  }
-
-  .header-title {
-    font-size: 2rem;
+  .app-layout {
+    grid-template-columns: 240px 1fr;
   }
 }
 
 @media (max-width: 768px) {
-  .app-shell {
-    flex-direction: column;
+  .app-layout {
+    grid-template-columns: 1fr;
   }
 
   .app-sidebar {
-    width: 100%;
     height: auto;
-    position: static;
+    position: relative;
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--rb-border);
   }
 
-  .page-header {
-    padding: 1.5rem;
+  .nav-links {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 8px;
   }
 
-  .page-content {
-    padding: 1.5rem;
+  .nav-link {
+    white-space: nowrap;
   }
 
   .header-content {
     flex-direction: column;
   }
 
-  .header-title {
-    font-size: 1.75rem;
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

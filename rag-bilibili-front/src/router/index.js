@@ -85,10 +85,6 @@ router.beforeEach(async (to) => {
     return { name: "videos" };
   }
 
-  if (to.name === "home" && authStore.isAuthenticated) {
-    return { name: "videos" };
-  }
-
   document.title = `${to.meta.title || "工作台"} | RAG-Bilibili`;
   return true;
 });

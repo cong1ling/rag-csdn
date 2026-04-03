@@ -13,9 +13,9 @@
       </div>
     </template>
 
-    <div class="page-grid">
-      <section class="surface span-8 card-section">
-        <div class="card-header">
+    <div class="page-grid chat-layout">
+      <section class="surface span-8 card-section chat-main">
+        <div class="card-header chat-header">
           <div>
             <div class="eyebrow">Conversation</div>
             <h2>{{ session?.videoTitle || "全部视频知识库" }}</h2>
@@ -39,19 +39,30 @@
           role="alert"
         />
 
-        <div v-if="messages.length" class="message-list">
-          <article v-for="message in messages" :key="message.localKey" class="surface-strong message-item">
-            <div class="list-card-top">
-              <StatusPill :label="roleMeta(message.role).label" :tone="roleMeta(message.role).tone" />
-              <span class="muted">{{ formatDateTime(message.createTime) }}</span>
-            </div>
-            <MarkdownContent
-              v-if="message.role === 'ASSISTANT'"
-              :content="message.content || '...'"
-              class="message-content"
-            />
-            <p v-else class="message-content">{{ message.content || "..." }}</p>
-          </article>
+        <div v-if="messages.length" class="message-list-container" ref="messageListRef">
+          <div class="message-list">
+            <article
+              v-for="message in messages"
+              :key="message.localKey"
+              class="message-item"
+              :class="message.role === 'USER' ? 'message-user' : 'message-assistant'"
+            >
+              <div class="message-meta">
+                <span class="message-role">{{ roleMeta(message.role).label }}</span>
+                <span class="muted time">{{ formatDateTime(message.createTime) }}</span>
+              </div>
+
+              <div class="message-bubble">
+                <MarkdownContent
+                  v-if="message.role === 'ASSISTANT'"
+                  :content="message.content || '...'"
+                  :streaming="streaming && message.localKey === pendingAssistantMessage?.localKey"
+                  class="message-content"
+                />
+                <p v-else class="message-content user-text">{{ message.content || "..." }}</p>
+              </div>
+            </article>
+          </div>
         </div>
 
         <EmptyState
@@ -61,32 +72,31 @@
           description="先提出一个你真正关心的问题，例如视频核心观点、实现步骤、删除规则或知识总结。"
         />
 
-        <div class="surface-strong card-section top-gap">
-          <div class="card-header">
+        <div class="composer-container surface-strong">
+          <div class="composer-header">
             <div>
-              <div class="eyebrow">Composer</div>
               <h3>发送问题</h3>
-              <p class="card-caption">建议一次只问一个重点问题，回答会更聚焦，也更方便继续追问。</p>
             </div>
             <div class="toolbar">
-              <el-button v-if="streaming" type="danger" plain @click="abortStream">停止生成</el-button>
+              <el-button v-if="streaming" type="danger" plain size="small" @click="abortStream">停止生成</el-button>
             </div>
           </div>
 
-          <el-form @submit.prevent="sendMessage">
-            <el-form-item label="问题内容">
-              <el-input
-                v-model.trim="draft"
-                type="textarea"
-                :rows="5"
-                resize="none"
-                maxlength="2000"
-                show-word-limit
-                placeholder="例如：这个视频讲了什么？"
-              />
-            </el-form-item>
-            <div class="toolbar">
-              <el-button type="primary" :loading="streaming" @click="sendMessage">开始提问</el-button>
+          <el-form @submit.prevent="sendMessage" class="composer-form">
+            <el-input
+              v-model.trim="draft"
+              type="textarea"
+              :rows="3"
+              resize="none"
+              maxlength="2000"
+              placeholder="例如：这个视频讲了什么？（按 Enter 发送，Shift + Enter 换行）"
+              @keydown.enter.prevent.exact="sendMessage"
+              class="composer-input"
+            />
+            <div class="composer-actions">
+              <el-button type="primary" :loading="streaming" @click="sendMessage">
+                发送 <el-icon class="el-icon--right"><Promotion /></el-icon>
+              </el-button>
             </div>
           </el-form>
         </div>
@@ -103,20 +113,29 @@
         <div v-if="session" class="stack">
           <div class="surface-strong card-section">
             <div class="eyebrow">使用说明</div>
-            <div class="stack">
-              <div><strong>问答范围：</strong>{{ session.sessionType === "SINGLE_VIDEO" ? "单个视频" : "全部视频" }}</div>
-              <div><strong>视频标题：</strong>{{ session.videoTitle || "全部视频知识库" }}</div>
-              <div><strong>创建时间：</strong>{{ formatDateTime(session.createTime) }}</div>
+            <div class="stack meta-list">
+              <div class="meta-item">
+                <span class="meta-label">问答范围：</span>
+                <span class="meta-value">{{ session.sessionType === "SINGLE_VIDEO" ? "单个视频" : "全部视频" }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">视频标题：</span>
+                <span class="meta-value">{{ session.videoTitle || "全部视频知识库" }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">创建时间：</span>
+                <span class="meta-value">{{ formatDateTime(session.createTime) }}</span>
+              </div>
             </div>
           </div>
 
           <div class="surface-strong card-section">
             <div class="eyebrow">提问建议</div>
-            <div class="stack top-gap">
-              <div>先问“这个视频主要讲了什么”，快速了解大意。</div>
-              <div>再问“有哪些关键步骤、限制或删除规则”，补齐细节。</div>
-              <div>如果是全视频会话，适合做横向对比和总结归纳。</div>
-              <div>回答不够聚焦时，可以换成更短、更具体的问题。</div>
+            <div class="stack top-gap tip-list">
+              <div class="tip-item">先问“这个视频主要讲了什么”，快速了解大意。</div>
+              <div class="tip-item">再问“有哪些关键步骤、限制或删除规则”，补齐细节。</div>
+              <div class="tip-item">如果是全视频会话，适合做横向对比和总结归纳。</div>
+              <div class="tip-item">回答不够聚焦时，可以换成更短、更具体的问题。</div>
             </div>
           </div>
         </div>
@@ -127,7 +146,8 @@
 
 <script setup>
 import { ElMessage } from "element-plus";
-import { onBeforeUnmount, ref } from "vue";
+import { Promotion } from "@element-plus/icons-vue";
+import { onBeforeUnmount, ref, nextTick } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import AppShell from "../components/AppShell.vue";
@@ -151,9 +171,11 @@ const loading = ref(false);
 const streaming = ref(false);
 const inlineError = ref("");
 const draft = ref("");
+const messageListRef = ref(null);
+
 let abortController = null;
 let streamThrottleTimer = null;
-let pendingAssistantMessage = null;
+const pendingAssistantMessage = ref(null);
 let pendingAssistantDelta = "";
 
 loadSession();
@@ -186,6 +208,14 @@ function patchMessage(localKey, updater) {
   return next;
 }
 
+function scrollToBottom() {
+  nextTick(() => {
+    if (messageListRef.value) {
+      messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
+    }
+  });
+}
+
 async function loadSession() {
   if (!Number.isInteger(sessionId) || sessionId <= 0) {
     inlineError.value = "当前会话地址无效，已返回会话列表。";
@@ -202,6 +232,7 @@ async function loadSession() {
     ]);
     session.value = sessionDetail;
     messages.value = messageList.map((item) => withLocalKey(item));
+    scrollToBottom();
   } catch (error) {
     inlineError.value = notifyError(error).message;
   } finally {
@@ -232,20 +263,21 @@ function clearPendingStreamFrame() {
 
 function flushPendingAssistantContent() {
   clearPendingStreamFrame();
-  if (!pendingAssistantMessage || !pendingAssistantDelta) {
+  if (!pendingAssistantMessage.value || !pendingAssistantDelta) {
     pendingAssistantDelta = "";
     return;
   }
 
-  pendingAssistantMessage = patchMessage(pendingAssistantMessage.localKey, (current) => ({
+  pendingAssistantMessage.value = patchMessage(pendingAssistantMessage.value.localKey, (current) => ({
     ...current,
     content: `${current.content || ""}${pendingAssistantDelta}`,
   }));
   pendingAssistantDelta = "";
+  scrollToBottom();
 }
 
 function scheduleAssistantContent(message, delta) {
-  pendingAssistantMessage = message;
+  pendingAssistantMessage.value = message;
   pendingAssistantDelta += delta;
 
   if (streamThrottleTimer) {
@@ -259,11 +291,12 @@ function scheduleAssistantContent(message, delta) {
 }
 
 async function sendMessage() {
+  if (streaming.value) return;
+
   inlineError.value = "";
 
   const currentDraft = draft.value.trim();
   if (!currentDraft) {
-    inlineError.value = "消息内容不能为空。";
     return;
   }
 
@@ -282,6 +315,8 @@ async function sendMessage() {
   });
 
   messages.value.push(userMessage, assistantMessage);
+  scrollToBottom();
+
   streaming.value = true;
   abortController = new AbortController();
   let hasStarted = false;
@@ -310,7 +345,7 @@ async function sendMessage() {
         end(payload) {
           flushPendingAssistantContent();
           hasCompleted = true;
-          pendingAssistantMessage = patchMessage(assistantMessage.localKey, (current) => ({
+          pendingAssistantMessage.value = patchMessage(assistantMessage.localKey, (current) => ({
             ...current,
             id: payload.assistantMessageId || current.id,
             content: payload.fullContent || current.content,
@@ -357,18 +392,219 @@ async function sendMessage() {
       }
     }
   } finally {
-    pendingAssistantMessage = null;
+    pendingAssistantMessage.value = null;
     pendingAssistantDelta = "";
     clearPendingStreamFrame();
     streaming.value = false;
     abortController = null;
+    scrollToBottom();
   }
 }
 </script>
 
 <style scoped>
-.message-content {
+.chat-layout {
+  height: calc(100vh - 200px);
+  min-height: 500px;
+}
+
+.chat-main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.chat-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--rb-border);
+  margin-bottom: 0;
+}
+
+.message-list-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  scroll-behavior: smooth;
+  background: var(--rb-bg);
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Base Message Item */
+.message-item {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.message-role {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--rb-text);
+}
+
+.time {
+  font-size: 0.75rem;
+  color: var(--rb-text-muted);
+}
+
+.message-bubble {
+  padding: 16px;
+  border-radius: var(--rb-radius-md);
+  position: relative;
+  line-height: 1.6;
+}
+
+/* User Message */
+.message-user {
+  align-self: flex-end;
+}
+
+.message-user .message-meta {
+  flex-direction: row-reverse;
+}
+
+.message-user .message-bubble {
+  background: var(--rb-panel-strong);
+  border: 1px solid var(--rb-border);
+  border-bottom-right-radius: 4px;
+}
+
+.user-text {
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+  color: var(--rb-text);
+  font-size: 0.95rem;
+}
+
+/* Assistant Message */
+.message-assistant {
+  align-self: flex-start;
+}
+
+.message-assistant .message-bubble {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Composer */
+.composer-container {
+  padding: 16px 24px;
+  border-top: 1px solid var(--rb-border);
+  background: var(--rb-panel);
+  margin: 0;
+  border-radius: 0 0 var(--rb-radius-md) var(--rb-radius-md);
+}
+
+.composer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.composer-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--rb-text);
+}
+
+.composer-form {
+  position: relative;
+}
+
+.composer-input :deep(.el-textarea__inner) {
+  border-radius: var(--rb-radius-md);
+  padding: 12px 16px;
+  padding-right: 120px; /* Make room for button */
+  font-size: 0.95rem;
+  background: var(--rb-bg);
+  border: 1px solid var(--rb-border);
+  box-shadow: none;
+}
+
+.composer-input :deep(.el-textarea__inner:focus) {
+  border-color: #3b82f6;
+}
+
+.composer-actions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+
+/* Meta Section */
+.meta-list {
+  gap: 12px;
+}
+
+.meta-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--rb-border);
+}
+
+.meta-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.meta-label {
+  font-weight: 600;
+  color: var(--rb-text-muted);
+  font-size: 0.85rem;
+}
+
+.meta-value {
+  font-size: 0.9rem;
+  max-width: 60%;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--rb-text);
+}
+
+.tip-list {
+  gap: 12px;
+}
+
+.tip-item {
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  background: var(--rb-panel);
+  border-radius: var(--rb-radius-sm);
+  border-left: 2px solid var(--rb-border-hover);
+  color: var(--rb-text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 1024px) {
+  .chat-layout {
+    height: auto;
+  }
+
+  .message-item {
+    max-width: 95%;
+  }
 }
 </style>

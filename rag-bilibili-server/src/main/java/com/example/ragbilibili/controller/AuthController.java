@@ -62,7 +62,6 @@ public class AuthController {
 
     @PostMapping("/logout")
     public Result<Void> logout() {
-        // JWT 无状态，前端丢弃 token 即完成登出
         return Result.success();
     }
 
@@ -73,17 +72,12 @@ public class AuthController {
     }
 
     /**
-     * 获取客户端真实 IP（兼容反向代理）
+     * 获取客户端 IP。
+     * 依赖 server.forward-headers-strategy 配置：
+     * - FRAMEWORK/NATIVE: Spring 自动从受信任的代理头中提取真实 IP 并填入 remoteAddr
+     * - NONE: 直接使用 TCP 连接的对端 IP（适用于无反向代理直接暴露的场景）
      */
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.split(",")[0].trim();
-        }
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip;
-        }
         return request.getRemoteAddr();
     }
 }

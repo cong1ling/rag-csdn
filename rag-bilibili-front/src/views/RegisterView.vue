@@ -1,17 +1,10 @@
 <template>
   <div class="auth-page">
-    <button class="theme-toggle-fab" @click="toggleTheme" :title="theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'">
-      <el-icon v-if="theme === 'dark'"><Sunny /></el-icon>
-      <el-icon v-else><Moon /></el-icon>
-    </button>
-
-    <div class="auth-background">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-    </div>
+    <SiteHeader />
+    <Background3D />
 
     <div class="auth-container">
-      <div class="auth-card">
+      <div class="auth-card surface-strong">
         <div class="auth-header">
           <RouterLink to="/" class="auth-logo">
             <span class="logo-icon">RB</span>
@@ -58,7 +51,7 @@
           <el-button
             type="primary"
             size="large"
-            class="auth-submit"
+            class="auth-submit full-width"
             :loading="authStore.loading"
             @click="handleSubmit"
           >
@@ -73,22 +66,22 @@
       </div>
 
       <div class="auth-features">
-        <div class="feature-item">
-          <div class="feature-icon">🔒</div>
+        <div class="feature-item surface">
+          <div class="feature-icon"><el-icon><Lock /></el-icon></div>
           <div class="feature-text">
             <strong>数据隔离</strong>
             <span>独立的用户数据空间</span>
           </div>
         </div>
-        <div class="feature-item">
-          <div class="feature-icon">⚡</div>
+        <div class="feature-item surface">
+          <div class="feature-icon"><el-icon><Lightning /></el-icon></div>
           <div class="feature-text">
             <strong>快速开始</strong>
             <span>注册后立即使用</span>
           </div>
         </div>
-        <div class="feature-item">
-          <div class="feature-icon">💾</div>
+        <div class="feature-item surface">
+          <div class="feature-icon"><el-icon><Files /></el-icon></div>
           <div class="feature-text">
             <strong>永久保存</strong>
             <span>数据长期保存</span>
@@ -101,13 +94,16 @@
 
 <script setup>
 import { ElMessage } from "element-plus";
-import { User, Lock, Sunny, Moon } from "@element-plus/icons-vue";
+import { User, Lock, Lightning, Files } from "@element-plus/icons-vue";
 import { reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import { useAuthStore } from "../stores/auth";
 import { useTheme } from "../composables/useTheme";
 import { notifyError } from "../utils/error";
+
+import Background3D from "../components/Background3D.vue";
+import SiteHeader from "../components/SiteHeader.vue";
 
 const { theme, toggleTheme } = useTheme();
 
@@ -151,110 +147,41 @@ async function handleSubmit() {
 </script>
 
 <style scoped>
-.theme-toggle-fab {
-  position: fixed;
-  top: 2rem;
-  right: 2rem;
-  z-index: 1000;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  color: #ffffff;
-  font-size: 1.25rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.theme-toggle-fab:hover {
-  background: rgba(255, 107, 53, 0.2);
-  border-color: rgba(255, 107, 53, 0.5);
-  transform: scale(1.1);
-}
-
 .auth-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #0f1419 0%, #1a1f2e 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
   position: relative;
   overflow: hidden;
-  transition: background 0.3s ease;
-}
-
-:root[data-theme="light"] .auth-page {
-  background: linear-gradient(180deg, #fffbf8 0%, #fff5f0 38%, #ffe8dc 100%);
-}
-
-.auth-background {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.3;
-  animation: float 20s ease-in-out infinite;
-}
-
-.orb-1 {
-  width: 500px;
-  height: 500px;
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-  top: -150px;
-  right: -150px;
-}
-
-.orb-2 {
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-  bottom: -100px;
-  left: -100px;
-  animation-delay: 5s;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(30px, -30px) scale(1.1);
-  }
+  isolation: isolate;
+  background: var(--rb-bg);
 }
 
 .auth-container {
-  position: relative;
-  z-index: 1;
   width: 100%;
   max-width: 1000px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3rem;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .auth-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  background: var(--rb-panel);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
   padding: 3rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
 }
 
 .auth-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 .auth-logo {
@@ -262,163 +189,141 @@ async function handleSubmit() {
   align-items: center;
   gap: 0.75rem;
   text-decoration: none;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .logo-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-  border-radius: 12px;
+  background: var(--rb-accent);
+  border-radius: var(--rb-radius-md);
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   color: #ffffff;
+  box-shadow: 0 0 20px rgba(var(--rb-accent-rgb), 0.3);
 }
 
 .logo-text {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--rb-text);
+  letter-spacing: -0.02em;
+  font-family: var(--font-heading);
 }
 
 .auth-title {
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--rb-text);
   margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+  font-family: var(--font-heading);
 }
 
 .auth-description {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--rb-text-soft);
 }
 
 .auth-alert {
   margin-bottom: 1.5rem;
 }
 
-.auth-form {
-  margin-bottom: 1.5rem;
-}
-
 .auth-form :deep(.el-form-item__label) {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--rb-text);
   font-weight: 500;
-}
-
-.auth-form :deep(.el-input__wrapper) {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: none;
-}
-
-.auth-form :deep(.el-input__wrapper:hover) {
-  border-color: rgba(255, 107, 53, 0.5);
-}
-
-.auth-form :deep(.el-input__wrapper.is-focus) {
-  border-color: #ff6b35;
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
-}
-
-.auth-form :deep(.el-input__inner) {
-  color: #ffffff;
-}
-
-.auth-form :deep(.el-input__inner::placeholder) {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.auth-form :deep(.el-input__prefix) {
-  color: rgba(255, 255, 255, 0.5);
+  padding-bottom: 8px;
 }
 
 .auth-submit {
-  width: 100%;
-  height: 48px;
-  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
-  border: none;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.auth-submit:hover {
-  background: linear-gradient(135deg, #ff7a45 0%, #ffa02e 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(255, 107, 53, 0.4);
+  margin-top: 1rem;
 }
 
 .auth-footer {
   text-align: center;
   padding-top: 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--rb-border);
 }
 
 .auth-footer-text {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--rb-text-soft);
   font-size: 0.875rem;
 }
 
 .auth-footer-link {
-  color: #ff6b35;
+  color: var(--rb-accent);
   text-decoration: none;
   font-weight: 600;
   margin-left: 0.5rem;
+  transition: opacity 0.2s;
 }
 
 .auth-footer-link:hover {
-  text-decoration: underline;
+  opacity: 0.8;
 }
 
 .auth-features {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .feature-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
   padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--rb-panel);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+}
+
+.feature-item:hover {
+  transform: translateX(8px);
+  border-color: var(--rb-accent);
+  background: var(--rb-panel-strong);
 }
 
 .feature-icon {
-  font-size: 2rem;
-  width: 60px;
-  height: 60px;
+  font-size: 1.5rem;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.2) 0%, rgba(74, 144, 226, 0.2) 100%);
-  border-radius: 12px;
-}
-
-.feature-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  background: var(--el-fill-color-light);
+  border-radius: var(--rb-radius-md);
+  color: var(--rb-accent);
+  flex-shrink: 0;
 }
 
 .feature-text strong {
-  color: #ffffff;
-  font-size: 1.125rem;
+  display: block;
+  color: var(--rb-text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .feature-text span {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.875rem;
+  color: var(--rb-text-soft);
+  font-size: 0.9rem;
+}
+
+.full-width {
+  width: 100%;
 }
 
 @media (max-width: 768px) {
   .auth-container {
     grid-template-columns: 1fr;
+    gap: 2rem;
   }
 
   .auth-features {
@@ -430,63 +335,3 @@ async function handleSubmit() {
   }
 }
 </style>
-
-/* Light Theme Overrides */
-:root[data-theme="light"] .auth-card {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(255, 107, 53, 0.14);
-}
-
-:root[data-theme="light"] .logo-text {
-  color: #1a1f2e;
-}
-
-:root[data-theme="light"] .auth-title {
-  color: #1a1f2e;
-}
-
-:root[data-theme="light"] .auth-description {
-  color: #53657f;
-}
-
-:root[data-theme="light"] .auth-form :deep(.el-form-item__label) {
-  color: #1a1f2e;
-}
-
-:root[data-theme="light"] .auth-form :deep(.el-input__wrapper) {
-  background: #ffffff;
-  border-color: rgba(255, 107, 53, 0.14);
-}
-
-:root[data-theme="light"] .auth-form :deep(.el-input__inner) {
-  color: #1a1f2e;
-}
-
-:root[data-theme="light"] .auth-form :deep(.el-input__inner::placeholder) {
-  color: rgba(26, 31, 46, 0.4);
-}
-
-:root[data-theme="light"] .auth-form :deep(.el-input__prefix) {
-  color: rgba(26, 31, 46, 0.5);
-}
-
-:root[data-theme="light"] .auth-footer {
-  border-top-color: rgba(255, 107, 53, 0.14);
-}
-
-:root[data-theme="light"] .auth-footer-text {
-  color: #53657f;
-}
-
-:root[data-theme="light"] .feature-item {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(255, 107, 53, 0.14);
-}
-
-:root[data-theme="light"] .feature-text strong {
-  color: #1a1f2e;
-}
-
-:root[data-theme="light"] .feature-text span {
-  color: #53657f;
-}

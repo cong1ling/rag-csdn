@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(cd rag-bilibili-front:*)",
-      "Bash(cd \"D:\\\\vibe-coding\\\\rag-bilibili\\\\rag-bilibili-front\" && npm install dompurify)"
+      "Bash(cd \"D:\\\\vibe-coding\\\\rag-bilibili\\\\rag-bilibili-front\" && npm install dompurify)",
+      "mcp__contextweaver__codebase-retrieval"
     ]
   }
 }

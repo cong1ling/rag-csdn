@@ -6,28 +6,38 @@
   >
     <template #header-actions>
       <div class="toolbar">
-        <el-input v-model.trim="keyword" placeholder="搜索标题或 BV 号" clearable style="width: 240px" />
+        <el-input v-model.trim="keyword" placeholder="搜索标题或 BV 号" clearable style="width: 240px">
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         <el-button @click="loadVideos" :loading="loading">刷新列表</el-button>
       </div>
     </template>
 
     <div class="page-grid">
       <section class="surface span-12 card-section">
-        <div class="stats-grid">
-          <div class="surface-strong stat-card">
-            <div class="eyebrow">Total</div>
-            <strong>{{ videos.length }}</strong>
-            <p>当前用户已导入的视频总数。</p>
+        <div class="bento-grid-mini">
+          <div class="bento-card">
+            <div class="bento-icon"><el-icon><VideoCamera /></el-icon></div>
+            <div class="bento-content">
+              <strong>{{ videos.length }}</strong>
+              <p>当前用户已导入的视频总数</p>
+            </div>
           </div>
-          <div class="surface-strong stat-card">
-            <div class="eyebrow">Ready</div>
-            <strong>{{ readyCount }}</strong>
-            <p>状态为 SUCCESS，可直接创建会话和问答。</p>
+          <div class="bento-card bento-success">
+            <div class="bento-icon"><el-icon><Select /></el-icon></div>
+            <div class="bento-content">
+              <strong>{{ readyCount }}</strong>
+              <p>状态为 SUCCESS，可直接创建会话</p>
+            </div>
           </div>
-          <div class="surface-strong stat-card">
-            <div class="eyebrow">Failed</div>
-            <strong>{{ failedCount }}</strong>
-            <p>状态为 FAILED，建议查看失败原因后删除重试。</p>
+          <div class="bento-card bento-danger">
+            <div class="bento-icon"><el-icon><Warning /></el-icon></div>
+            <div class="bento-content">
+              <strong>{{ failedCount }}</strong>
+              <p>状态为 FAILED，建议查看失败原因</p>
+            </div>
           </div>
         </div>
       </section>
@@ -48,37 +58,42 @@
 
         <el-alert v-if="inlineError" class="alert-inline" type="error" :title="inlineError" show-icon />
 
-        <div v-if="filteredVideos.length" class="video-list">
-          <article v-for="video in filteredVideos" :key="video.id" class="surface-strong list-card">
-            <div class="list-card-top">
-              <div>
-                <h3>{{ video.title }}</h3>
-                <p>{{ clampText(video.description, 180) || "暂无视频简介" }}</p>
-              </div>
+        <div v-if="filteredVideos.length" class="bento-grid">
+          <article v-for="video in filteredVideos" :key="video.id" class="bento-item bento-video">
+            <div class="bento-item-header">
+              <span class="badge-inline code-text">{{ video.bvid }}</span>
               <StatusPill :label="statusMeta(video.status).label" :tone="statusMeta(video.status).tone" />
             </div>
 
-            <div class="list-card-bottom top-gap">
-              <div class="flow-meta">
-                <span class="badge-inline code-text">{{ video.bvid }}</span>
-                <span class="badge-inline">内容片段 {{ video.chunkCount ?? "--" }}</span>
-                <span class="badge-inline">{{ formatDateTime(video.importTime) }}</span>
-              </div>
-              <div class="toolbar">
-                <el-button @click="showVideoDetail(video.id)">详情</el-button>
-                <el-button type="primary" plain :disabled="video.status !== 'SUCCESS'" @click="createSingleSession(video)">
-                  进入问答
-                </el-button>
-                <el-button type="danger" plain @click="deleteVideo(video)">删除</el-button>
-              </div>
+            <div class="bento-item-content">
+              <h3 class="bento-title">{{ video.title }}</h3>
+              <p class="bento-desc">{{ clampText(video.description, 180) || "暂无视频简介" }}</p>
+            </div>
+
+            <div class="bento-item-meta top-gap">
+              <span class="meta-label">
+                <el-icon><Document /></el-icon> 内容片段 {{ video.chunkCount ?? "--" }}
+              </span>
+              <span class="meta-label">
+                <el-icon><Clock /></el-icon> {{ formatDateTime(video.importTime) }}
+              </span>
+            </div>
+
+            <div class="bento-item-actions hover-reveal">
+              <el-button @click="showVideoDetail(video.id)">详情</el-button>
+              <el-button type="primary" plain :disabled="video.status !== 'SUCCESS'" @click="createSingleSession(video)">
+                进入问答
+              </el-button>
+              <el-button type="danger" plain @click="deleteVideo(video)">删除</el-button>
             </div>
 
             <el-alert
               v-if="video.status === 'FAILED' && video.failReason"
-              class="top-gap"
+              class="top-gap bento-alert"
               type="warning"
               :title="video.failReason"
               show-icon
+              :closable="false"
             />
           </article>
         </div>
@@ -86,42 +101,114 @@
         <EmptyState
           v-else
           badge="VIDEOS"
-          title="还没有匹配的视频"
-          :description="videos.length ? '当前搜索条件下没有结果。' : '先去导入一个 B 站视频，再回到这里管理知识库。'"
+          :title="videos.length ? '没有匹配的视频' : '知识库空空如也'"
+          :description="videos.length ? '尝试更换搜索关键词。' : '第一步：请先导入一个 B 站视频。系统会自动提取字幕并进行向量化处理，完成后你就可以在这里看到它。'"
         >
           <RouterLink to="/import">
-            <el-button type="primary">去导入视频</el-button>
+            <el-button type="primary" size="large">
+              立即导入第一个视频
+              <el-icon class="el-icon--right"><Download /></el-icon>
+            </el-button>
           </RouterLink>
         </EmptyState>
       </section>
     </div>
 
     <el-drawer v-model="detailVisible" title="视频详情" size="520px">
-      <div v-loading="detailLoading" class="stack">
+      <div v-loading="detailLoading" class="stack drawer-content">
         <template v-if="selectedVideo">
-          <div class="surface-strong card-section">
+          <div class="surface-strong card-section bento-drawer-header">
             <div class="eyebrow">Video Detail</div>
             <h3>{{ selectedVideo.title }}</h3>
             <p class="card-caption">{{ selectedVideo.description || "暂无简介" }}</p>
           </div>
           <div class="surface-strong card-section">
-            <div class="stack">
-              <div><strong>BV 号：</strong><span class="code-text">{{ selectedVideo.bvid }}</span></div>
-              <div><strong>状态：</strong>{{ statusMeta(selectedVideo.status).label }}</div>
-              <div><strong>分片数：</strong>{{ selectedVideo.chunkCount ?? "--" }}</div>
-              <div><strong>导入时间：</strong>{{ formatDateTime(selectedVideo.importTime) }}</div>
-              <div v-if="selectedVideo.failReason"><strong>失败原因：</strong>{{ selectedVideo.failReason }}</div>
+            <div class="stack meta-list">
+              <div class="meta-item">
+                <strong>BV 号：</strong>
+                <span class="code-text">{{ selectedVideo.bvid }}</span>
+              </div>
+              <div class="meta-item">
+                <strong>状态：</strong>
+                <StatusPill :label="statusMeta(selectedVideo.status).label" :tone="statusMeta(selectedVideo.status).tone" />
+              </div>
+              <div class="meta-item">
+                <strong>分片数：</strong>
+                <span>{{ selectedVideo.chunkCount ?? "--" }}</span>
+              </div>
+              <div class="meta-item">
+                <strong>导入时间：</strong>
+                <span>{{ formatDateTime(selectedVideo.importTime) }}</span>
+              </div>
+              <div v-if="selectedVideo.failReason" class="meta-item error-item">
+                <strong>失败原因：</strong>
+                <span class="text-danger">{{ selectedVideo.failReason }}</span>
+              </div>
             </div>
           </div>
         </template>
       </div>
     </el-drawer>
+
+    <!-- Welcome & Guide Dialog -->
+    <el-dialog
+      v-model="guideVisible"
+      title="欢迎使用 RAG Bilibili！"
+      width="640px"
+      :close-on-click-modal="false"
+      class="guide-dialog"
+    >
+      <div class="guide-welcome-content">
+        <div class="guide-hero">
+          <div class="nav-mark">RB</div>
+          <div class="hero-text">
+            <h3>开启你的智能视频知识库</h3>
+            <p>只需简单三步，即可将 B 站视频转化为可随时提问的专家级助手。</p>
+          </div>
+        </div>
+
+        <div class="guide-steps-vertical">
+          <div class="guide-step">
+            <div class="step-num">01</div>
+            <div class="step-info">
+              <h4>导入视频</h4>
+              <p>点击左侧“导入新视频”，输入 B 站视频链接。系统会自动解析字幕并进行向量化建模。</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">02</div>
+            <div class="step-info">
+              <h4>查看状态</h4>
+              <p>在“视频列表”中观察进度。当状态变为 <strong>SUCCESS</strong> 时，表示知识沉淀已完成。</p>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">03</div>
+            <div class="step-info">
+              <h4>发起对话</h4>
+              <p>点击“进入问答”，即可针对该视频（或全局库）发起对话。AI 会根据视频原文精准回答。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-footer-tip">
+          <el-icon><InfoFilled /></el-icon>
+          <span>提示：我们已在侧边栏为您准备了显眼的“导入新视频”入口。</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" size="large" @click="closeGuide" class="full-width">
+          我准备好了，开始体验
+        </el-button>
+      </template>
+    </el-dialog>
   </AppShell>
 </template>
 
 <script setup>
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, ref } from "vue";
+import { Search, VideoCamera, Select, Warning, Clock, Document, Download, InfoFilled } from "@element-plus/icons-vue";
+import { computed, ref, onMounted } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import AppShell from "../components/AppShell.vue";
@@ -142,6 +229,21 @@ const keyword = ref("");
 const detailVisible = ref(false);
 const detailLoading = ref(false);
 const selectedVideo = ref(null);
+const guideVisible = ref(false);
+
+const GUIDE_STORAGE_KEY = "rag-bilibili-guide-shown";
+
+onMounted(() => {
+  const guideShown = localStorage.getItem(GUIDE_STORAGE_KEY);
+  if (!guideShown) {
+    guideVisible.value = true;
+  }
+});
+
+function closeGuide() {
+  guideVisible.value = false;
+  localStorage.setItem(GUIDE_STORAGE_KEY, "true");
+}
 
 const filteredVideos = computed(() => {
   const query = keyword.value.toLowerCase();
@@ -223,3 +325,299 @@ async function deleteVideo(video) {
   }
 }
 </script>
+
+<style scoped>
+/* Bento Grid Layouts */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.bento-grid-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* Base Card Style */
+.bento-card {
+  background: var(--rb-panel);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+}
+
+.bento-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--rb-accent);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.bento-icon {
+  font-size: 1.5rem;
+  color: var(--rb-accent);
+  background: var(--rb-bg-strong);
+  width: 56px;
+  height: 56px;
+  border-radius: var(--rb-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rb-border);
+}
+
+.bento-content strong {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--rb-text);
+  line-height: 1;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.bento-content p {
+  margin: 0;
+  color: var(--rb-text-soft);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* List Items (Videos) */
+.bento-item {
+  background: var(--rb-panel);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 260px;
+  backdrop-filter: blur(8px);
+}
+
+.bento-item:hover {
+  transform: translateY(-4px);
+  border-color: var(--rb-accent);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+.bento-title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  margin: 0 0 10px 0;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--rb-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bento-desc {
+  margin: 0;
+  color: var(--rb-text-soft);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bento-item-meta {
+  display: flex;
+  gap: 20px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--rb-border);
+}
+
+.meta-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--rb-text-soft);
+  font-weight: 500;
+}
+
+.bento-item-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bento-alert {
+  margin-top: 16px;
+}
+
+/* Hover reveal effect for actions */
+@media (hover: hover) {
+  .hover-reveal {
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+
+  .bento-item:hover .hover-reveal {
+    opacity: 1;
+  }
+}
+
+/* Drawer Detail Styling */
+.drawer-content {
+  color: var(--rb-text);
+}
+
+.bento-drawer-header {
+  background: var(--rb-panel);
+  border-color: var(--rb-border);
+}
+
+.bento-drawer-header h3 {
+  color: var(--rb-text);
+}
+
+.meta-list {
+  gap: 16px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.meta-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.meta-item strong {
+  color: var(--rb-text-muted);
+  font-size: 0.85rem;
+}
+
+.meta-item span {
+  font-size: 0.95rem;
+  color: var(--rb-text);
+}
+
+.text-danger {
+  color: #ef4444;
+}
+
+/* Guide Dialog Styling */
+.guide-welcome-content {
+  color: var(--rb-text);
+  padding: 0 12px;
+}
+
+.guide-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.guide-hero .nav-mark {
+  width: 56px;
+  height: 56px;
+  font-size: 1.5rem;
+}
+
+.guide-hero h3 {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.guide-hero p {
+  color: var(--rb-text-soft);
+  font-size: 1rem;
+}
+
+.guide-steps-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.guide-step {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.step-num {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rb-bg-strong);
+  border: 1px solid var(--rb-border);
+  border-radius: 50%;
+  color: var(--rb-accent);
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.step-info h4 {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.step-info p {
+  color: var(--rb-text-soft);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.guide-footer-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--rb-bg-strong);
+  border-radius: var(--rb-radius-md);
+  color: var(--rb-accent);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.guide-dialog :deep(.el-dialog__footer) {
+  padding-top: 0;
+  padding-bottom: 32px;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .bento-grid-mini {
+    grid-template-columns: 1fr;
+  }
+
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

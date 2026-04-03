@@ -20,7 +20,14 @@ public class JwtUtil {
     public JwtUtil(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration}") long expiration) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException(
+                    "jwt.secret must be at least 32 bytes (256 bits) for HMAC-SHA256. " +
+                    "Current length: " + keyBytes.length + " bytes. " +
+                    "Please set a longer secret in application.yml.");
+        }
+        this.key = Keys.hmacShaKeyFor(keyBytes);
         this.expiration = expiration;
     }
 
