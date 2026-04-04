@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 验证 GlobalExceptionHandler 对 DuplicateKeyException 的处理
+ * 验证 GlobalExceptionHandler 对各类异常的处理
  */
 @WebMvcTest(AuthController.class)
 class GlobalExceptionHandlerTest {
@@ -43,7 +43,6 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testDuplicateKeyExceptionReturnsUserAlreadyExists() throws Exception {
-        // Mock UserService.register() 抛出 DuplicateKeyException（模拟数据库唯一键冲突）
         when(userService.register(any())).thenThrow(
                 new DuplicateKeyException("Duplicate entry 'testuser' for key 'username'"));
 
@@ -54,8 +53,8 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(1002))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409))
                 .andExpect(jsonPath("$.message").value("用户名已存在"));
     }
 
@@ -65,6 +64,6 @@ class GlobalExceptionHandlerTest {
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .content("{}"))
                 .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.message").value("小网站求你们别测试了 (っ °Д °;)っ"));
+                .andExpect(jsonPath("$.code").value(415));
     }
 }

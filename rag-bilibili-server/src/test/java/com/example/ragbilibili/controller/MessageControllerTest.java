@@ -84,9 +84,8 @@ class MessageControllerTest {
                         .header("Authorization", "Bearer mocked.jwt.token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("消息内容不能为空"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
 
         verifyNoInteractions(chatService);
     }

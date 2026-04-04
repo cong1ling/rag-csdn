@@ -48,8 +48,8 @@ class RegisterDisabledTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(1005))
-                .andExpect(jsonPath("$.message").value("管理员未开启注册"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403))
+                .andExpect(jsonPath("$.message").value("注册功能已关闭"));
     }
 }

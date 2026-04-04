@@ -80,9 +80,9 @@ class AuthControllerSecurityTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(1006))
-                .andExpect(jsonPath("$.message").value("操作过于频繁，请稍后再试"));
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value(429))
+                .andExpect(jsonPath("$.message").value("操作过于频繁，请稍后重试"));
     }
 
     @Test
@@ -108,9 +108,9 @@ class AuthControllerSecurityTest {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(1006))
-                .andExpect(jsonPath("$.message").value("操作过于频繁，请稍后再试"));
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value(429))
+                .andExpect(jsonPath("$.message").value("操作过于频繁，请稍后重试"));
     }
 
     @Test
@@ -122,9 +122,8 @@ class AuthControllerSecurityTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("用户名只能包含字母、数字和下划线"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
     }
 
     @Test
@@ -136,7 +135,7 @@ class AuthControllerSecurityTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
     }
 

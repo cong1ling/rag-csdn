@@ -4,7 +4,6 @@ import com.example.ragbilibili.dto.request.ImportVideoRequest;
 import com.example.ragbilibili.dto.response.VideoResponse;
 import com.example.ragbilibili.interceptor.LoginInterceptor;
 import com.example.ragbilibili.service.VideoService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.ragbilibili.util.UserContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,9 +30,6 @@ class VideoControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
     @MockBean
     private VideoService videoService;
 
@@ -51,34 +47,35 @@ class VideoControllerTest {
         UserContext.remove();
     }
 
+    /**
+     * 手动构建 JSON，因为 ImportVideoRequest 的 cookie 字段标注了
+     * {@code @JsonProperty(access = WRITE_ONLY)}，objectMapper.writeValueAsString()
+     * 会跳过这些字段导致请求体缺少必填项。
+     */
+    private String buildImportJson(String bvidOrUrl, String sessdata, String biliJct, String buvid3) {
+        return String.format(
+                "{\"bvidOrUrl\":\"%s\",\"sessdata\":\"%s\",\"biliJct\":\"%s\",\"buvid3\":\"%s\"}",
+                bvidOrUrl, sessdata, biliJct, buvid3);
+    }
+
     @Test
     void testImportVideo() throws Exception {
-        ImportVideoRequest request = new ImportVideoRequest();
-        request.setBvidOrUrl("BV1xx411c7mD");
-        request.setSessdata("test_sessdata");
-        request.setBiliJct("test_bili_jct");
-        request.setBuvid3("test_buvid3");
-
         VideoResponse response = new VideoResponse();
         response.setId(1L);
         response.setBvid("BV1xx411c7mD");
-        response.setTitle("测试视频");
-        response.setDescription("测试描述");
-        response.setStatus("SUCCESS");
-        response.setChunkCount(10);
+        response.setTitle("导入中...");
+        response.setStatus("IMPORTING");
 
         when(videoService.importVideo(any(ImportVideoRequest.class), eq(1L))).thenReturn(response);
 
         mockMvc.perform(post("/api/videos")
                         .header("Authorization", "Bearer mocked.jwt.token")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(buildImportJson("BV1xx411c7mD", "test_sessdata", "test_bili_jct", "test_buvid3")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.bvid").value("BV1xx411c7mD"))
-                .andExpect(jsonPath("$.data.title").value("测试视频"))
-                .andExpect(jsonPath("$.data.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.data.chunkCount").value(10));
+                .andExpect(jsonPath("$.data.status").value("IMPORTING"));
     }
 
     @Test
