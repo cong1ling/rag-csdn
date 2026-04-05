@@ -1,4 +1,3 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve workflow execution time
 name: Java CI with Maven
 
 on:
@@ -20,29 +19,5 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    # 1. 打包项目（生成jar）
     - name: Build with Maven
       run: mvn -B package --file rag-bilibili-server/pom.xml
-
-    # 2. 仅上传jar到服务器 → 不做任何启动操作！
-    - name: Upload jar to ECS
-      if: github.event_name == 'push'
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.ECS_HOST }}
-        username: ${{ secrets.ECS_USER }}
-        key: ${{ secrets.ECS_SSH_KEY }}
-        source: "rag-bilibili-server/target/rag-bilibili-server-1.0.0.jar"
-        target: "/opt/rag-bilibili/"
-        strip_components: 2
-
-    # 3. 仅提示上传完成，不操作服务
-    - name: Upload Finished
-      if: github.event_name == 'push'
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.ECS_HOST }}
-        username: ${{ secrets.ECS_USER }}
-        key: ${{ secrets.ECS_SSH_KEY }}
-        script: |
-          echo "✅ JAR包上传完成！请手动在服务器启动服务"
