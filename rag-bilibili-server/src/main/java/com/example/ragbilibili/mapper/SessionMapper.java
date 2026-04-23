@@ -32,6 +32,13 @@ public interface SessionMapper {
     int insert(Session session);
 
     /**
+     * 更新会话摘要
+     */
+    int updateSummary(@Param("id") Long id,
+                      @Param("conversationSummary") String conversationSummary,
+                      @Param("summaryUpdateTime") java.time.LocalDateTime summaryUpdateTime);
+
+    /**
      * 删除会话
      */
     int deleteById(@Param("id") Long id);

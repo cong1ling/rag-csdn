@@ -5,6 +5,7 @@ import com.alibaba.cloud.ai.reader.bilibili.BilibiliDocumentReader;
 import com.alibaba.cloud.ai.reader.bilibili.BilibiliResource;
 import com.alibaba.cloud.ai.vectorstore.dashvector.DashVectorStore;
 import com.example.ragbilibili.dto.request.ImportVideoRequest;
+import com.example.ragbilibili.dto.request.RebuildVideoRequest;
 import com.example.ragbilibili.dto.response.VideoResponse;
 import com.example.ragbilibili.entity.Chunk;
 import com.example.ragbilibili.entity.VectorMapping;
@@ -15,11 +16,11 @@ import com.example.ragbilibili.exception.ErrorCode;
 import com.example.ragbilibili.mapper.*;
 import com.example.ragbilibili.service.VideoService;
 import com.example.ragbilibili.util.BVIDParser;
+import com.example.ragbilibili.util.ChunkDocumentSplitter;
 import com.example.ragbilibili.util.VectorIDGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
@@ -53,7 +54,7 @@ public class VideoServiceImpl implements VideoService {
     private MessageMapper messageMapper;
 
     @Autowired
-    private TokenTextSplitter tokenTextSplitter;
+    private ChunkDocumentSplitter chunkDocumentSplitter;
 
     @Autowired
     private DashVectorStore dashVectorStore;
@@ -91,7 +92,40 @@ public class VideoServiceImpl implements VideoService {
         Long videoId = video.getId();
 
         // 4. 提交异步任务：拉取字幕、切分、向量化
-        taskExecutor.execute(() -> executeImport(videoId, userId, bvid, request));
+        taskExecutor.execute(() -> executeImport(
+                videoId,
+                userId,
+                bvid,
+                request.getSessdata(),
+                request.getBiliJct(),
+                request.getBuvid3(),
+                false));
+
+        return convertToResponse(video);
+    }
+
+    @Override
+    public VideoResponse rebuildVideo(Long videoId, RebuildVideoRequest request, Long userId) {
+        Video video = videoMapper.selectById(videoId);
+        if (video == null || !video.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.VIDEO_NOT_FOUND);
+        }
+
+        video.setStatus(VideoStatus.IMPORTING.getCode());
+        video.setFailReason(null);
+        if (video.getTitle() == null || video.getTitle().isBlank()) {
+            video.setTitle("重建中...");
+        }
+        videoMapper.update(video);
+
+        taskExecutor.execute(() -> executeImport(
+                videoId,
+                userId,
+                video.getBvid(),
+                request.getSessdata(),
+                request.getBiliJct(),
+                request.getBuvid3(),
+                true));
 
         return convertToResponse(video);
     }
@@ -100,14 +134,12 @@ public class VideoServiceImpl implements VideoService {
      * 异步执行实际的导入流程。
      * 在独立线程中运行，不占用 HTTP 请求线程。
      */
-    private void executeImport(Long videoId, Long userId, String bvid, ImportVideoRequest request) {
+    private void executeImport(Long videoId, Long userId, String bvid,
+                               String sessdata, String biliJct, String buvid3,
+                               boolean rebuildExistingIndex) {
         try {
             // 1. 使用 BilibiliDocumentReader 读取视频内容
-            BilibiliCredentials credentials = BilibiliCredentials.builder()
-                    .sessdata(request.getSessdata())
-                    .biliJct(request.getBiliJct())
-                    .buvid3(request.getBuvid3())
-                    .build();
+            BilibiliCredentials credentials = buildCredentials(sessdata, biliJct, buvid3);
 
             BilibiliDocumentReader reader = new BilibiliDocumentReader(new BilibiliResource(bvid, credentials));
             List<Document> documents = reader.get();
@@ -122,7 +154,7 @@ public class VideoServiceImpl implements VideoService {
             String videoDescription = (String) document.getMetadata().get("description");
 
             // 2. 文本切分
-            List<Document> splitDocuments = tokenTextSplitter.apply(documents);
+            List<Document> splitDocuments = chunkDocumentSplitter.split(documents);
             List<Document> indexedDocuments = new ArrayList<>(splitDocuments.size());
 
             // 3. 生成向量ID并准备数据
@@ -137,9 +169,11 @@ public class VideoServiceImpl implements VideoService {
                         .id(vectorId)
                         .text(doc.getText())
                         .metadata(new HashMap<>(doc.getMetadata()))
+                        .metadata("title", videoTitle)
                         .metadata("userId", userId)
                         .metadata("bvid", bvid)
                         .metadata("chunkIndex", i)
+                        .metadata("totalChunks", totalChunks)
                         .build();
                 indexedDocuments.add(indexedDocument);
 
@@ -155,15 +189,20 @@ public class VideoServiceImpl implements VideoService {
                 chunks.add(chunk);
             }
 
-            // 4. 批量插入分片
+            // 4. 重建场景先清理旧索引，再写入新数据
+            if (rebuildExistingIndex) {
+                cleanupExistingIndex(videoId);
+            }
+
+            // 5. 批量插入分片
             if (!chunks.isEmpty()) {
                 chunkMapper.batchInsert(chunks);
             }
 
-            // 5. 写入 DashVector
+            // 6. 写入 DashVector
             dashVectorStore.add(indexedDocuments);
 
-            // 6. 创建向量映射
+            // 7. 创建向量映射
             List<VectorMapping> mappings = new ArrayList<>();
             for (int i = 0; i < chunks.size(); i++) {
                 Chunk chunk = chunks.get(i);
@@ -182,19 +221,39 @@ public class VideoServiceImpl implements VideoService {
                 vectorMappingMapper.batchInsert(mappings);
             }
 
-            // 7. 更新视频状态为成功
+            // 8. 更新视频状态为成功
             Video video = videoMapper.selectById(videoId);
             video.setTitle(videoTitle);
             video.setDescription(videoDescription);
             video.setStatus(VideoStatus.SUCCESS.getCode());
+            video.setFailReason(null);
             videoMapper.update(video);
 
-            log.info("视频导入成功: userId={}, bvid={}, chunks={}", userId, bvid, totalChunks);
+            log.info("视频{}成功: userId={}, bvid={}, chunks={}",
+                    rebuildExistingIndex ? "重建" : "导入", userId, bvid, totalChunks);
 
         } catch (Exception e) {
-            log.error("视频导入失败: userId={}, bvid={}", userId, bvid, e);
+            log.error("视频{}失败: userId={}, bvid={}",
+                    rebuildExistingIndex ? "重建" : "导入", userId, bvid, e);
             markVideoFailed(videoId, e.getMessage());
         }
+    }
+
+    private BilibiliCredentials buildCredentials(String sessdata, String biliJct, String buvid3) {
+        return BilibiliCredentials.builder()
+                .sessdata(sessdata)
+                .biliJct(biliJct)
+                .buvid3(buvid3)
+                .build();
+    }
+
+    private void cleanupExistingIndex(Long videoId) {
+        List<String> vectorIds = vectorMappingMapper.selectVectorIdsByVideoId(videoId);
+        if (!vectorIds.isEmpty()) {
+            dashVectorStore.delete(vectorIds);
+        }
+        vectorMappingMapper.deleteByVideoId(videoId);
+        chunkMapper.deleteByVideoId(videoId);
     }
 
     private void markVideoFailed(Long videoId, String reason) {
@@ -273,7 +332,9 @@ public class VideoServiceImpl implements VideoService {
         response.setBvid(video.getBvid());
         response.setTitle(video.getTitle());
         response.setDescription(video.getDescription());
-        response.setImportTime(video.getImportTime().format(FORMATTER));
+        if (video.getImportTime() != null) {
+            response.setImportTime(video.getImportTime().format(FORMATTER));
+        }
         response.setStatus(video.getStatus());
         response.setFailReason(video.getFailReason());
 

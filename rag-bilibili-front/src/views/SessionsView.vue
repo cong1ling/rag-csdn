@@ -42,6 +42,12 @@
               <p>全部视频对话</p>
             </div>
           </div>
+          <div class="bento-card">
+            <div class="bento-content">
+              <strong>{{ summarizedCount }}</strong>
+              <p>已有摘要会话</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -52,7 +58,7 @@
             <h2>会话列表</h2>
             <p class="card-caption">如果你想聚焦某一个视频，就创建单视频会话；如果想跨视频比较或总结，就创建全视频会话。</p>
           </div>
-          <el-input v-model.trim="keyword" placeholder="搜索会话标题" clearable style="width: 240px">
+          <el-input v-model.trim="keyword" placeholder="搜索标题或摘要" clearable style="width: 240px">
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
@@ -64,10 +70,13 @@
         <div v-if="filteredSessions.length" class="bento-grid">
           <article v-for="session in filteredSessions" :key="session.id" class="bento-item">
             <div class="bento-item-header">
-              <StatusPill
-                :label="session.sessionType === 'SINGLE_VIDEO' ? '单视频' : '全视频'"
-                :tone="session.sessionType === 'SINGLE_VIDEO' ? 'success' : 'warning'"
-              />
+              <div class="session-tags">
+                <StatusPill
+                  :label="session.sessionType === 'SINGLE_VIDEO' ? '单视频' : '全视频'"
+                  :tone="session.sessionType === 'SINGLE_VIDEO' ? 'success' : 'warning'"
+                />
+                <StatusPill v-if="session.conversationSummary" label="已生成摘要" tone="info" />
+              </div>
               <span class="muted text-sm">{{ formatDateTime(session.createTime) }}</span>
             </div>
 
@@ -80,6 +89,16 @@
                     : "检索范围限定为当前用户导入的全部视频。"
                 }}
               </p>
+
+              <div class="summary-panel">
+                <div class="summary-label">会话摘要</div>
+                <p v-if="session.conversationSummary" class="summary-text">{{ session.conversationSummary }}</p>
+                <p v-else class="summary-empty">还没有摘要。进入对话并完成几轮问答后，系统会自动沉淀上下文重点。</p>
+              </div>
+
+              <div class="summary-foot">
+                <span class="muted text-sm">摘要更新：{{ formatDateTime(session.summaryUpdateTime) }}</span>
+              </div>
             </div>
 
             <div class="bento-item-actions hover-reveal">
@@ -121,16 +140,16 @@
 
 <script setup>
 import { ElMessage, ElMessageBox } from "element-plus";
-import { ChatDotRound, Search, Plus, Download } from "@element-plus/icons-vue";
+import { ChatDotRound, Download, Plus, Search } from "@element-plus/icons-vue";
 import { computed, ref } from "vue";
-import { useRouter, RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 
+import { sessionsApi } from "../api/sessions";
+import { videosApi } from "../api/videos";
 import AppShell from "../components/AppShell.vue";
 import EmptyState from "../components/EmptyState.vue";
 import SessionDialog from "../components/SessionDialog.vue";
 import StatusPill from "../components/StatusPill.vue";
-import { sessionsApi } from "../api/sessions";
-import { videosApi } from "../api/videos";
 import { notifyError } from "../utils/error";
 import { formatDateTime } from "../utils/format";
 
@@ -150,11 +169,16 @@ const filteredSessions = computed(() => {
   if (!query) {
     return sessions.value;
   }
-  return sessions.value.filter((item) => (item.videoTitle || "全部视频知识库").toLowerCase().includes(query));
+  return sessions.value.filter((item) => {
+    const title = item.videoTitle || "全部视频知识库";
+    const summary = item.conversationSummary || "";
+    return `${title} ${summary}`.toLowerCase().includes(query);
+  });
 });
 
 const singleCount = computed(() => sessions.value.filter((item) => item.sessionType === "SINGLE_VIDEO").length);
 const allVideosCount = computed(() => sessions.value.filter((item) => item.sessionType === "ALL_VIDEOS").length);
+const summarizedCount = computed(() => sessions.value.filter((item) => item.conversationSummary).length);
 
 loadData();
 
@@ -195,7 +219,7 @@ async function handleCreateSession(payload) {
 
 async function removeSession(session) {
   try {
-    await ElMessageBox.confirm(`确定删除这个会话吗？`, "删除会话", {
+    await ElMessageBox.confirm("确定删除这个会话吗？", "删除会话", {
       confirmButtonText: "确认删除",
       cancelButtonText: "取消",
       type: "warning",
@@ -216,10 +240,9 @@ async function openChat(sessionId) {
 </script>
 
 <style scoped>
-/* Bento Grid Layouts */
 .bento-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
 }
 
@@ -229,7 +252,6 @@ async function openChat(sessionId) {
   gap: 12px;
 }
 
-/* Base Card Style */
 .bento-card {
   background: var(--rb-panel-strong);
   border: 1px solid var(--rb-border);
@@ -278,7 +300,6 @@ async function openChat(sessionId) {
   font-size: 0.875rem;
 }
 
-/* List Items (Sessions) */
 .bento-item {
   background: var(--rb-panel-strong);
   border: 1px solid var(--rb-border);
@@ -287,23 +308,32 @@ async function openChat(sessionId) {
   display: flex;
   flex-direction: column;
   transition: border-color 0.2s, box-shadow 0.2s;
-  min-height: 180px;
+  min-height: 260px;
 }
 
 .bento-item:hover {
   border-color: var(--rb-border-hover);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .bento-item-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.session-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .bento-item-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .bento-title {
@@ -325,6 +355,42 @@ async function openChat(sessionId) {
   line-height: 1.5;
 }
 
+.summary-panel {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-md);
+  background: var(--rb-bg);
+}
+
+.summary-label {
+  margin-bottom: 8px;
+  color: var(--rb-text-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.summary-text,
+.summary-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.summary-text {
+  color: var(--rb-text);
+}
+
+.summary-empty {
+  color: var(--rb-text-muted);
+}
+
+.summary-foot {
+  margin-top: 12px;
+}
+
 .bento-item-actions {
   display: flex;
   gap: 12px;
@@ -336,7 +402,6 @@ async function openChat(sessionId) {
   color: var(--rb-text-muted);
 }
 
-/* Hover reveal effect for actions */
 @media (hover: hover) {
   .hover-reveal .action-btn {
     opacity: 0.8;
@@ -345,6 +410,12 @@ async function openChat(sessionId) {
 
   .bento-item:hover .hover-reveal .action-btn {
     opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .bento-item-header {
+    flex-direction: column;
   }
 }
 </style>

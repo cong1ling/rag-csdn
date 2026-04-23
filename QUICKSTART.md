@@ -171,12 +171,12 @@ sudo systemctl restart rag-bilibili
 sudo systemctl restart nginx
 ```
 
-### 问题 2：无法登录（Session 问题）
+### 问题 2：无法登录（JWT / 鉴权问题）
 
 确保：
 1. 前后端都使用 HTTPS
-2. 后端 CORS 配置了 `allowCredentials: true`
-3. 前端 axios 配置了 `withCredentials: true`
+2. 前端请求头已正确携带 `Authorization: Bearer <token>`
+3. 后端未被反向代理、CORS 或网关策略拦掉 `Authorization` 头
 
 ### 问题 3：SSE 流式响应中断
 

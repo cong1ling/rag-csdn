@@ -58,6 +58,8 @@ public class SessionServiceImpl implements SessionService {
         session.setUserId(userId);
         session.setSessionType(sessionType);
         session.setVideoId(request.getVideoId());
+        session.setConversationSummary(null);
+        session.setSummaryUpdateTime(null);
         session.setCreateTime(LocalDateTime.now());
 
         sessionMapper.insert(session);
@@ -104,6 +106,10 @@ public class SessionServiceImpl implements SessionService {
         response.setSessionType(session.getSessionType());
         response.setVideoId(session.getVideoId());
         response.setCreateTime(session.getCreateTime().format(FORMATTER));
+        response.setConversationSummary(session.getConversationSummary());
+        if (session.getSummaryUpdateTime() != null) {
+            response.setSummaryUpdateTime(session.getSummaryUpdateTime().format(FORMATTER));
+        }
 
         // 如果是单视频对话，查询视频标题
         if (session.getVideoId() != null) {

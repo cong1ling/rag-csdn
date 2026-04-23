@@ -3,6 +3,7 @@ package com.example.ragbilibili.util;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtUtilTest {
@@ -38,5 +39,12 @@ class JwtUtilTest {
     @Test
     void testIsValidWithEmptyToken() {
         assertThat(jwtUtil.isValid("")).isFalse();
+    }
+
+    @Test
+    void testRejectPlaceholderSecret() {
+        assertThatThrownBy(() -> new JwtUtil("CHANGE_ME_TO_A_RANDOM_STRING_AT_LEAST_32_BYTES", 604800000L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be replaced");
     }
 }

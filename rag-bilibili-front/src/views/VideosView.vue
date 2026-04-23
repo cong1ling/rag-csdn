@@ -5,8 +5,8 @@
     subtitle="在这里管理已经整理好的视频资料。你可以查看内容概况、删除旧资料，或者直接围绕某个视频开始提问。"
   >
     <template #header-actions>
-      <div class="toolbar">
-        <el-input v-model.trim="keyword" placeholder="搜索标题或 BV 号" clearable style="width: 240px">
+        <div class="toolbar">
+          <el-input v-model.trim="keyword" placeholder="搜索标题或 BV 号" clearable style="width: 240px">
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
@@ -84,6 +84,7 @@
               <el-button type="primary" plain :disabled="video.status !== 'SUCCESS'" @click="createSingleSession(video)">
                 进入问答
               </el-button>
+              <el-button plain @click="openRebuildDialog(video)">重建索引</el-button>
               <el-button type="danger" plain @click="deleteVideo(video)">删除</el-button>
             </div>
 
@@ -149,6 +150,35 @@
         </template>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="rebuildDialogVisible" title="重建视频索引" width="560px">
+      <div class="stack">
+        <p class="card-caption">
+          将基于当前视频的 BV 号重新抓取字幕、重新切分并重写向量索引，用于让历史数据也应用最新的
+          chunk overlap 策略。
+        </p>
+        <div v-if="rebuildTarget" class="surface-strong card-section">
+          <div class="meta-item"><strong>目标视频：</strong><span>{{ rebuildTarget.title }}</span></div>
+          <div class="meta-item"><strong>BV 号：</strong><span class="code-text">{{ rebuildTarget.bvid }}</span></div>
+        </div>
+        <el-alert v-if="rebuildInlineError" type="error" :title="rebuildInlineError" show-icon :closable="false" />
+        <el-form label-position="top" class="import-form">
+          <el-form-item label="SESSDATA">
+            <el-input v-model.trim="rebuildForm.sessdata" type="password" show-password placeholder="Cookie: SESSDATA" />
+          </el-form-item>
+          <el-form-item label="bili_jct">
+            <el-input v-model.trim="rebuildForm.biliJct" type="password" show-password placeholder="Cookie: bili_jct" />
+          </el-form-item>
+          <el-form-item label="buvid3">
+            <el-input v-model.trim="rebuildForm.buvid3" type="password" show-password placeholder="Cookie: buvid3" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="closeRebuildDialog">取消</el-button>
+        <el-button type="primary" :loading="rebuildSubmitting" @click="submitRebuild">开始重建</el-button>
+      </template>
+    </el-dialog>
 
     <!-- Welcome & Guide Dialog -->
     <el-dialog
@@ -230,6 +260,15 @@ const detailVisible = ref(false);
 const detailLoading = ref(false);
 const selectedVideo = ref(null);
 const guideVisible = ref(false);
+const rebuildDialogVisible = ref(false);
+const rebuildSubmitting = ref(false);
+const rebuildInlineError = ref("");
+const rebuildTarget = ref(null);
+const rebuildForm = ref({
+  sessdata: "",
+  biliJct: "",
+  buvid3: "",
+});
 
 const GUIDE_STORAGE_KEY = "rag-bilibili-guide-shown";
 
@@ -301,6 +340,47 @@ async function createSingleSession(video) {
     await router.push({ name: "chat", params: { sessionId: session.id } });
   } catch (error) {
     notifyError(error);
+  }
+}
+
+function openRebuildDialog(video) {
+  rebuildTarget.value = video;
+  rebuildInlineError.value = "";
+  rebuildDialogVisible.value = true;
+}
+
+function closeRebuildDialog() {
+  rebuildDialogVisible.value = false;
+  rebuildInlineError.value = "";
+  rebuildTarget.value = null;
+  rebuildForm.value = {
+    sessdata: "",
+    biliJct: "",
+    buvid3: "",
+  };
+}
+
+async function submitRebuild() {
+  if (!rebuildTarget.value) {
+    rebuildInlineError.value = "未找到需要重建的视频。";
+    return;
+  }
+  if (!rebuildForm.value.sessdata || !rebuildForm.value.biliJct || !rebuildForm.value.buvid3) {
+    rebuildInlineError.value = "请完整填写重建索引所需的 3 个凭证字段。";
+    return;
+  }
+
+  rebuildSubmitting.value = true;
+  rebuildInlineError.value = "";
+  try {
+    await videosApi.rebuild(rebuildTarget.value.id, rebuildForm.value);
+    ElMessage.success("已提交重建任务，请稍后刷新查看状态");
+    closeRebuildDialog();
+    await loadVideos();
+  } catch (error) {
+    rebuildInlineError.value = notifyError(error).message;
+  } finally {
+    rebuildSubmitting.value = false;
   }
 }
 

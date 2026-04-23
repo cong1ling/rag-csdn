@@ -11,11 +11,18 @@
 
 - 用户注册、登录、JWT 鉴权
 - 导入 B 站视频字幕内容，支持输入 BV 号或包含 BV 的视频 URL
+- 异步导入视频，支持查看导入状态与失败原因
 - 自动切分文本并写入 DashVector 向量库
+- 新导入链路支持可配置 `chunk overlap`
+- 支持对历史视频执行“重建索引”，让旧数据应用最新切分策略
 - 管理视频库、查看导入状态与失败原因
 - 创建两类问答会话
 - `SINGLE_VIDEO`：仅检索单个视频
 - `ALL_VIDEOS`：检索当前用户导入的全部视频
+- Query Rewrite：多轮对话先改写为独立检索查询
+- Hybrid Search：向量召回 + 关键词召回融合
+- Rerank：规则型二阶段重排，可选模型式精排
+- 动态 Top-K：按问题复杂度动态调整召回数量
 - 基于 SSE 的流式问答输出
 - 会话与消息历史持久化
 
@@ -57,11 +64,26 @@
 用户创建会话并提问
         |
         v
-按会话范围检索相关片段
+Query Rewrite -> 按会话范围做 Hybrid Search -> Rerank -> 动态 Top-K
         |
         v
 大模型基于检索上下文流式生成回答
 ```
+
+## 当前 RAG 检索链路
+
+- 检索阈值配置化：默认 `similarity-threshold=0.35`
+- Query Rewrite：有历史对话时，先改写当前问题再检索
+- Chunk overlap：新导入视频默认 `chunk-size=512`、`overlap-chars=128`
+- 支持对历史视频执行重建索引，使旧数据同步应用最新 overlap 策略
+- Hybrid Search：向量检索与 MySQL `chunk` 表全文关键词检索融合
+- Rerank：默认按标题命中、正文命中、关键词覆盖率和初始分数做规则型二阶段重排，并支持可配置模型式精排
+- 动态 Top-K：简单事实问题 `Top-3`，常规说明 `Top-5`，复杂分析问题 `Top-8`
+
+说明：
+
+- 历史视频可以在“视频列表”中通过“重建索引”重新抓取字幕并重写向量索引
+- 模型式 `Rerank` 默认关闭，建议按延迟和成本要求按需开启
 
 ## 仓库结构
 
@@ -122,7 +144,7 @@ rag-bilibili-front/src/
 - 服务端口：`8080`
 - 数据库：`rag_bilibili`
 - DashScope Embedding 模型：`text-embedding-v4`
-- OpenAI 兼容聊天模型：`deepseek-v3.2`
+- OpenAI 兼容聊天模型：`qwen3.6-plus`
 - DashVector Collection：`bilibili`
 
 ### 1. 配置数据库
@@ -134,7 +156,7 @@ spring:
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/rag_bilibili?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    password: ${DB_PASSWORD:123456}
 ```
 
 你可以直接修改 [application.yml](./rag-bilibili-server/src/main/resources/application.yml)，或者通过环境变量覆盖：
@@ -170,6 +192,30 @@ $env:DASHVECTOR_ENDPOINT="your_dashvector_endpoint"
 - `OPENAI_BASE_URL` 需要指向 OpenAI 兼容接口地址
 - 聊天模型名、Embedding 模型名、DashVector collection 名都可以在 [application.yml](./rag-bilibili-server/src/main/resources/application.yml) 中调整
 - DashVector collection 的向量维度需要与 Embedding 模型维度一致，当前配置为 `1024`
+
+### 额外推荐配置
+
+这些配置已在后端支持，建议按需调整：
+
+```yaml
+rag:
+  chat:
+    query-rewrite-enabled: true
+    hybrid-search-enabled: true
+    keyword-top-k: 8
+    rerank-enabled: true
+    rerank-candidate-top-k: 20
+    model-rerank-enabled: false
+    model-rerank-top-k: 8
+    dynamic-top-k-enabled: true
+    simple-top-k: 3
+    normal-top-k: 5
+    complex-top-k: 8
+  ingest:
+    chunking:
+      chunk-size: 512
+      overlap-chars: 128
+```
 
 ### 3. 启动后端
 
@@ -223,8 +269,9 @@ Vite 开发服务器会把 `/api/*` 代理到 `VITE_PROXY_TARGET`，默认是 `h
 3. 在“导入视频”页面输入 BV 号或视频 URL。
 4. 填写 B 站访问凭证：`SESSDATA`、`bili_jct`、`buvid3`。
 5. 等待导入完成后，在“视频列表”中查看状态。
-6. 创建单视频会话或全视频会话。
-7. 在聊天页发起问题，查看基于检索结果的流式回答。
+6. 如需让历史视频应用最新切分策略，可在“视频列表”中执行“重建索引”。
+7. 创建单视频会话或全视频会话。
+8. 在聊天页发起问题，查看基于检索结果的流式回答。
 
 ## 主要页面
 
@@ -242,6 +289,7 @@ Vite 开发服务器会把 `/api/*` 代理到 `VITE_PROXY_TARGET`，默认是 `h
 - `POST /api/auth/logout`
 - `GET /api/auth/current`
 - `POST /api/videos`
+- `POST /api/videos/{id}/rebuild`
 - `GET /api/videos`
 - `GET /api/videos/{id}`
 - `DELETE /api/videos/{id}`
@@ -270,8 +318,10 @@ Vite 开发服务器会把 `/api/*` 代理到 `VITE_PROXY_TARGET`，默认是 `h
 ## 当前实现说明
 
 - 认证链路使用 JWT Bearer Token，不是服务端 Session/Cookie 登录态
+- 视频导入是异步执行；创建导入任务后，前端需轮询或刷新查看状态
 - 视频导入依赖 B 站字幕读取能力；如果目标视频无字幕，导入会失败
 - 注册开关由后端配置项 `register.enabled` 控制，默认开启
+- 当前混合检索中的关键词召回基于 MySQL Full-Text `MATCH ... AGAINST`；数据规模继续增大时可升级为全文索引以外的独立检索引擎
 - 仓库内部分历史文档与当前代码实现存在少量差异，建议以实际工程配置与源码为准
 
 ## 测试

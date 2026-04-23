@@ -9,6 +9,12 @@ export const videosApi = {
     }
     return http.post("/videos", payload);
   },
+  rebuild(id, payload) {
+    if (isDeveloperModeEnabled()) {
+      return devServer.rebuildVideo(id, payload);
+    }
+    return http.post(`/videos/${id}/rebuild`, payload);
+  },
   list() {
     if (isDeveloperModeEnabled()) {
       return devServer.listVideos();

@@ -53,12 +53,26 @@
               </div>
 
               <div class="message-bubble">
-                <MarkdownContent
-                  v-if="message.role === 'ASSISTANT'"
-                  :content="message.content || '...'"
-                  :streaming="streaming && message.localKey === pendingAssistantMessage?.localKey"
-                  class="message-content"
-                />
+                <template v-if="message.role === 'ASSISTANT'">
+                  <MarkdownContent
+                    :content="message.content || '...'"
+                    :streaming="streaming && message.localKey === pendingAssistantMessage?.localKey"
+                    class="message-content"
+                  />
+                  <div v-if="message.responseMeta" class="assistant-insight">
+                    <div class="assistant-insight-pills">
+                      <StatusPill
+                        :label="message.responseMeta.confidenceText"
+                        :tone="message.responseMeta.confidenceTone"
+                      />
+                      <StatusPill :label="message.responseMeta.intentText" tone="info" />
+                      <StatusPill v-if="message.responseMeta.knowledgeGap" label="信息缺口" tone="warning" />
+                    </div>
+                    <p class="assistant-insight-note" :class="`tone-${message.responseMeta.noteTone}`">
+                      {{ message.responseMeta.note }}
+                    </p>
+                  </div>
+                </template>
                 <p v-else class="message-content user-text">{{ message.content || "..." }}</p>
               </div>
             </article>
@@ -130,6 +144,56 @@
           </div>
 
           <div class="surface-strong card-section">
+            <div class="eyebrow">Conversation Memory</div>
+            <div class="stack top-gap">
+              <p v-if="session.conversationSummary" class="summary-text">{{ session.conversationSummary }}</p>
+              <p v-else class="empty-hint">当前会话还没有摘要。多轮连续提问后，系统会自动压缩上下文并复用。</p>
+              <div class="meta-list">
+                <div class="meta-item">
+                  <span class="meta-label">摘要更新时间：</span>
+                  <span class="meta-value">{{ formatDateTime(session.summaryUpdateTime) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="surface-strong card-section">
+            <div class="eyebrow">Answer Signals</div>
+            <div v-if="latestResponseMeta" class="stack top-gap signal-list">
+              <div class="assistant-insight-pills">
+                <StatusPill :label="latestResponseMeta.confidenceText" :tone="latestResponseMeta.confidenceTone" />
+                <StatusPill :label="latestResponseMeta.intentText" tone="info" />
+                <StatusPill v-if="latestResponseMeta.summaryUsed" label="用了摘要记忆" tone="success" />
+              </div>
+
+              <div class="signal-grid">
+                <div class="signal-row">
+                  <span class="signal-label">检索策略</span>
+                  <span class="signal-value">{{ latestResponseMeta.intentHint }}</span>
+                </div>
+                <div class="signal-row">
+                  <span class="signal-label">命中文档</span>
+                  <span class="signal-value">{{ latestResponseMeta.sourceCount ?? "--" }}</span>
+                </div>
+                <div class="signal-row">
+                  <span class="signal-label">置信分</span>
+                  <span class="signal-value">{{ latestResponseMeta.confidenceDisplay }}</span>
+                </div>
+              </div>
+
+              <div v-if="latestResponseMeta.rewrittenQuery" class="signal-block">
+                <div class="signal-label">改写后的查询</div>
+                <div class="signal-query">{{ latestResponseMeta.rewrittenQuery }}</div>
+              </div>
+
+              <div class="signal-banner" :class="`tone-${latestResponseMeta.noteTone}`">
+                {{ latestResponseMeta.note }}
+              </div>
+            </div>
+            <p v-else class="empty-hint">完成一轮回答后，这里会显示查询理解、改写结果和回答可信度。</p>
+          </div>
+
+          <div class="surface-strong card-section">
             <div class="eyebrow">提问建议</div>
             <div class="stack top-gap tip-list">
               <div class="tip-item">先问“这个视频主要讲了什么”，快速了解大意。</div>
@@ -147,19 +211,49 @@
 <script setup>
 import { ElMessage } from "element-plus";
 import { Promotion } from "@element-plus/icons-vue";
-import { onBeforeUnmount, ref, nextTick } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import AppShell from "../components/AppShell.vue";
-import EmptyState from "../components/EmptyState.vue";
-import StatusPill from "../components/StatusPill.vue";
-import MarkdownContent from "../components/MarkdownContent.vue";
 import { messagesApi } from "../api/messages";
 import { sessionsApi } from "../api/sessions";
+import AppShell from "../components/AppShell.vue";
+import EmptyState from "../components/EmptyState.vue";
+import MarkdownContent from "../components/MarkdownContent.vue";
+import StatusPill from "../components/StatusPill.vue";
 import { MESSAGE_ROLE_META } from "../constants/options";
 import { notifyError } from "../utils/error";
 import { formatDateTime } from "../utils/format";
 import { logger } from "../utils/logger";
+
+const QUERY_INTENT_META = {
+  DIRECT: {
+    text: "直接检索",
+    hint: "问题足够明确，直接进入召回与回答。",
+  },
+  AMBIGUOUS: {
+    text: "模糊补全",
+    hint: "问题偏短或语义不完整，系统先扩写再检索。",
+  },
+  BROAD: {
+    text: "宽泛拆解",
+    hint: "问题范围较大，系统会拆成多个子问题并行检索。",
+  },
+};
+
+const CONFIDENCE_META = {
+  HIGH: {
+    text: "高置信",
+    tone: "success",
+  },
+  MEDIUM: {
+    text: "中置信",
+    tone: "warning",
+  },
+  LOW: {
+    text: "低置信",
+    tone: "error",
+  },
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -172,11 +266,19 @@ const streaming = ref(false);
 const inlineError = ref("");
 const draft = ref("");
 const messageListRef = ref(null);
+const pendingAssistantMessage = ref(null);
+const messageMetaById = ref({});
 
 let abortController = null;
 let streamThrottleTimer = null;
-const pendingAssistantMessage = ref(null);
 let pendingAssistantDelta = "";
+
+const latestResponseMeta = computed(() => {
+  const matched = [...messages.value]
+    .reverse()
+    .find((item) => item.role === "ASSISTANT" && item.responseMeta);
+  return matched?.responseMeta || null;
+});
 
 loadSession();
 
@@ -189,10 +291,19 @@ function roleMeta(role) {
   return MESSAGE_ROLE_META[role] || { label: role || "UNKNOWN", tone: "warning" };
 }
 
+function getStoredResponseMeta(message) {
+  if (!message?.id) {
+    return null;
+  }
+  return messageMetaById.value[String(message.id)] || null;
+}
+
 function withLocalKey(message) {
+  const responseMeta = getStoredResponseMeta(message);
   return {
     localKey: message.id || `${message.role}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     ...message,
+    ...(responseMeta ? { responseMeta } : {}),
   };
 }
 
@@ -206,6 +317,70 @@ function patchMessage(localKey, updater) {
   const next = typeof updater === "function" ? updater(current) : { ...current, ...updater };
   messages.value[index] = next;
   return next;
+}
+
+function rememberResponseMeta(messageId, responseMeta) {
+  if (!messageId || !responseMeta) {
+    return;
+  }
+  messageMetaById.value = {
+    ...messageMetaById.value,
+    [String(messageId)]: responseMeta,
+  };
+}
+
+function buildResponseMeta(payload = {}) {
+  const hasPayload =
+    payload.queryIntent ||
+    payload.rewrittenQuery ||
+    payload.confidenceLabel ||
+    payload.confidenceScore !== undefined ||
+    payload.sourceCount !== undefined ||
+    payload.knowledgeGap !== undefined ||
+    payload.summaryUsed !== undefined;
+
+  if (!hasPayload) {
+    return null;
+  }
+
+  const queryIntent = String(payload.queryIntent || "DIRECT").toUpperCase();
+  const confidenceLabel = String(payload.confidenceLabel || "MEDIUM").toUpperCase();
+  const intentMeta = QUERY_INTENT_META[queryIntent] || QUERY_INTENT_META.DIRECT;
+  const confidenceMeta = CONFIDENCE_META[confidenceLabel] || CONFIDENCE_META.MEDIUM;
+  const score = Number(payload.confidenceScore);
+  const normalizedScore = Number.isFinite(score) ? Math.max(0, Math.min(1, score)) : null;
+  const knowledgeGap = Boolean(payload.knowledgeGap);
+  const sourceCountValue = Number(payload.sourceCount);
+  const sourceCount = Number.isFinite(sourceCountValue) ? sourceCountValue : null;
+  const rewrittenQuery = String(payload.rewrittenQuery || "").trim();
+
+  let note = "回答基于当前命中的内容生成，你可以继续追问具体细节。";
+  let noteTone = "info";
+
+  if (knowledgeGap || confidenceLabel === "LOW") {
+    note = "当前回答命中信息偏少，仅供参考。建议把问题再缩小一点，或补充关键词继续提问。";
+    noteTone = "warning";
+  } else if (confidenceLabel === "HIGH") {
+    note = "当前回答命中内容较充分，适合继续沿当前话题深挖。";
+    noteTone = "success";
+  }
+
+  return {
+    queryIntent,
+    intentText: intentMeta.text,
+    intentHint: intentMeta.hint,
+    rewrittenQuery,
+    confidenceLabel,
+    confidenceText: confidenceMeta.text,
+    confidenceTone: confidenceMeta.tone,
+    confidenceScore: normalizedScore,
+    confidenceDisplay: normalizedScore === null ? "--" : `${Math.round(normalizedScore * 100)}%`,
+    sourceCount,
+    knowledgeGap,
+    summaryUsed: Boolean(payload.summaryUsed),
+    note,
+    noteTone,
+  };
 }
 
 function scrollToBottom() {
@@ -291,7 +466,9 @@ function scheduleAssistantContent(message, delta) {
 }
 
 async function sendMessage() {
-  if (streaming.value) return;
+  if (streaming.value) {
+    return;
+  }
 
   inlineError.value = "";
 
@@ -343,12 +520,19 @@ async function sendMessage() {
           scheduleAssistantContent(assistantMessage, payload.delta);
         },
         end(payload) {
+          const responseMeta = buildResponseMeta(payload);
           flushPendingAssistantContent();
           hasCompleted = true;
+
+          if (payload.assistantMessageId && responseMeta) {
+            rememberResponseMeta(payload.assistantMessageId, responseMeta);
+          }
+
           pendingAssistantMessage.value = patchMessage(assistantMessage.localKey, (current) => ({
             ...current,
             id: payload.assistantMessageId || current.id,
             content: payload.fullContent || current.content,
+            ...(responseMeta ? { responseMeta } : {}),
           }));
           logger.info("chat", "收到 end 事件", payload);
         },
@@ -358,7 +542,12 @@ async function sendMessage() {
       },
       abortController.signal
     );
-    const latestMessages = await messagesApi.list(sessionId);
+
+    const [latestSession, latestMessages] = await Promise.all([
+      sessionsApi.detail(sessionId),
+      messagesApi.list(sessionId),
+    ]);
+    session.value = latestSession;
     messages.value = latestMessages.map((item) => withLocalKey(item));
     ElMessage.success("回答生成完成");
   } catch (error) {
@@ -437,7 +626,6 @@ async function sendMessage() {
   gap: 24px;
 }
 
-/* Base Message Item */
 .message-item {
   display: flex;
   flex-direction: column;
@@ -469,7 +657,6 @@ async function sendMessage() {
   line-height: 1.6;
 }
 
-/* User Message */
 .message-user {
   align-self: flex-end;
 }
@@ -492,7 +679,6 @@ async function sendMessage() {
   font-size: 0.95rem;
 }
 
-/* Assistant Message */
 .message-assistant {
   align-self: flex-start;
 }
@@ -503,7 +689,39 @@ async function sendMessage() {
   padding: 0;
 }
 
-/* Composer */
+.assistant-insight {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-md);
+  background: var(--rb-panel);
+}
+
+.assistant-insight-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assistant-insight-note {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--rb-text-muted);
+}
+
+.tone-success {
+  color: var(--rb-success);
+}
+
+.tone-info {
+  color: var(--rb-text-soft);
+}
+
+.tone-warning {
+  color: var(--rb-warning);
+}
+
 .composer-container {
   padding: 16px 24px;
   border-top: 1px solid var(--rb-border);
@@ -533,7 +751,7 @@ async function sendMessage() {
 .composer-input :deep(.el-textarea__inner) {
   border-radius: var(--rb-radius-md);
   padding: 12px 16px;
-  padding-right: 120px; /* Make room for button */
+  padding-right: 120px;
   font-size: 0.95rem;
   background: var(--rb-bg);
   border: 1px solid var(--rb-border);
@@ -550,7 +768,6 @@ async function sendMessage() {
   bottom: 12px;
 }
 
-/* Meta Section */
 .meta-list {
   gap: 12px;
 }
@@ -584,6 +801,84 @@ async function sendMessage() {
   color: var(--rb-text);
 }
 
+.summary-text,
+.empty-hint {
+  margin: 0;
+  line-height: 1.7;
+  font-size: 0.9rem;
+}
+
+.summary-text {
+  color: var(--rb-text-soft);
+}
+
+.empty-hint {
+  color: var(--rb-text-muted);
+}
+
+.signal-list {
+  gap: 14px;
+}
+
+.signal-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.signal-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--rb-border);
+}
+
+.signal-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.signal-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--rb-text-muted);
+}
+
+.signal-value {
+  flex: 1;
+  text-align: right;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--rb-text);
+}
+
+.signal-block {
+  display: grid;
+  gap: 8px;
+}
+
+.signal-query {
+  padding: 10px 12px;
+  border-radius: var(--rb-radius-sm);
+  border: 1px solid var(--rb-border);
+  background: var(--rb-bg);
+  color: var(--rb-text-soft);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.signal-banner {
+  padding: 12px 14px;
+  border-radius: var(--rb-radius-md);
+  border: 1px solid var(--rb-border);
+  background: var(--rb-bg);
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
 .tip-list {
   gap: 12px;
 }
@@ -605,6 +900,31 @@ async function sendMessage() {
 
   .message-item {
     max-width: 95%;
+  }
+}
+
+@media (max-width: 768px) {
+  .signal-row,
+  .meta-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .signal-value,
+  .meta-value {
+    max-width: 100%;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .composer-input :deep(.el-textarea__inner) {
+    padding-right: 16px;
+    min-height: 120px;
+  }
+
+  .composer-actions {
+    position: static;
+    margin-top: 12px;
   }
 }
 </style>

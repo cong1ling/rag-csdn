@@ -2,7 +2,7 @@ package com.example.ragbilibili.config;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -10,22 +10,8 @@ import org.springframework.context.annotation.Configuration;
  * Spring AI 配置
  */
 @Configuration
+@EnableConfigurationProperties({ChatOptimizationProperties.class, ChunkingProperties.class})
 public class SpringAIConfig {
-    /**
-     * 配置 TokenTextSplitter
-     * V1 版本采用硬编码参数
-     */
-    @Bean
-    public TokenTextSplitter tokenTextSplitter() {
-        return new TokenTextSplitter(
-                800,    // defaultChunkSize
-                350,    // minChunkSizeChars
-                5,      // minChunkLengthToEmbed
-                10000,  // maxNumChunks
-                true    // keepSeparator
-        );
-    }
-
     /**
      * 配置 ChatClient.Builder
      */

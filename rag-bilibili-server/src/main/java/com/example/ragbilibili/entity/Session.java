@@ -32,4 +32,14 @@ public class Session {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 对话摘要
+     */
+    private String conversationSummary;
+
+    /**
+     * 摘要更新时间
+     */
+    private LocalDateTime summaryUpdateTime;
 }

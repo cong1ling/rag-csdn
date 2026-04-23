@@ -13,6 +13,7 @@
         <result column="total_chunks" property="totalChunks"/>
         <result column="chunk_text" property="chunkText"/>
         <result column="create_time" property="createTime"/>
+        <result column="keyword_score" property="keywordScore"/>
     </resultMap>
 
     <select id="selectById" resultMap="BaseResultMap">
@@ -32,6 +33,21 @@
         SELECT COUNT(*)
         FROM chunk
         WHERE video_id = #{videoId}
+    </select>
+
+    <select id="searchByKeywords" resultMap="BaseResultMap">
+        SELECT id, video_id, user_id, bvid, title, chunk_index, total_chunks, chunk_text, create_time,
+               MATCH(title, chunk_text) AGAINST (#{searchText} IN NATURAL LANGUAGE MODE) AS keyword_score
+        FROM chunk
+        WHERE user_id = #{userId}
+        <if test="bvid != null and bvid != ''">
+            AND bvid = #{bvid}
+        </if>
+        AND MATCH(title, chunk_text) AGAINST (#{searchText} IN NATURAL LANGUAGE MODE)
+        ORDER BY keyword_score DESC,
+                 create_time DESC,
+                 chunk_index ASC
+        LIMIT #{limit}
     </select>
 
     <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">

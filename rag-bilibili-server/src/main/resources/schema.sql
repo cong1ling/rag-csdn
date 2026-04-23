@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS `chunk` (
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_video_id` (`video_id`),
-    KEY `idx_bvid` (`bvid`)
+    KEY `idx_bvid` (`bvid`),
+    FULLTEXT KEY `ft_title_chunk_text` (`title`, `chunk_text`) WITH PARSER ngram
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分片表';
 
 -- 向量映射表
@@ -64,6 +65,8 @@ CREATE TABLE IF NOT EXISTS `session` (
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
     `session_type` VARCHAR(20) NOT NULL COMMENT '会话类型：SINGLE_VIDEO/ALL_VIDEOS',
     `video_id` BIGINT COMMENT '关联视频ID（单视频对话时有值）',
+    `conversation_summary` TEXT COMMENT '对话摘要',
+    `summary_update_time` DATETIME COMMENT '摘要更新时间',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`),

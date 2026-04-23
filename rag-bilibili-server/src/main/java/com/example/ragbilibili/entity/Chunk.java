@@ -52,4 +52,9 @@ public class Chunk {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 关键词检索得分
+     */
+    private Double keywordScore;
 }

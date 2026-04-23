@@ -12,4 +12,6 @@ public class SessionResponse {
     private Long videoId;
     private String videoTitle;
     private String createTime;
+    private String conversationSummary;
+    private String summaryUpdateTime;
 }

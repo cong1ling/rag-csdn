@@ -1,6 +1,7 @@
 package com.example.ragbilibili.controller;
 
 import com.example.ragbilibili.dto.request.ImportVideoRequest;
+import com.example.ragbilibili.dto.request.RebuildVideoRequest;
 import com.example.ragbilibili.dto.response.VideoResponse;
 import com.example.ragbilibili.interceptor.LoginInterceptor;
 import com.example.ragbilibili.service.VideoService;
@@ -58,6 +59,12 @@ class VideoControllerTest {
                 bvidOrUrl, sessdata, biliJct, buvid3);
     }
 
+    private String buildRebuildJson(String sessdata, String biliJct, String buvid3) {
+        return String.format(
+                "{\"sessdata\":\"%s\",\"biliJct\":\"%s\",\"buvid3\":\"%s\"}",
+                sessdata, biliJct, buvid3);
+    }
+
     @Test
     void testImportVideo() throws Exception {
         VideoResponse response = new VideoResponse();
@@ -102,6 +109,27 @@ class VideoControllerTest {
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].bvid").value("BV1xx411c7mD"))
                 .andExpect(jsonPath("$.data[1].bvid").value("BV1yy411c7mE"));
+    }
+
+    @Test
+    void testRebuildVideo() throws Exception {
+        VideoResponse response = new VideoResponse();
+        response.setId(1L);
+        response.setBvid("BV1xx411c7mD");
+        response.setTitle("测试视频");
+        response.setStatus("IMPORTING");
+
+        when(videoService.rebuildVideo(eq(1L), any(RebuildVideoRequest.class), eq(1L)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/videos/1/rebuild")
+                        .header("Authorization", "Bearer mocked.jwt.token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(buildRebuildJson("test_sessdata", "test_bili_jct", "test_buvid3")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.status").value("IMPORTING"));
     }
 
     @Test

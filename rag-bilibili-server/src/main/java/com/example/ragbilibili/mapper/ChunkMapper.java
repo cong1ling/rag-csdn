@@ -27,6 +27,14 @@ public interface ChunkMapper {
     int countByVideoId(@Param("videoId") Long videoId);
 
     /**
+     * 基于关键词检索分片
+     */
+    List<Chunk> searchByKeywords(@Param("userId") Long userId,
+                                 @Param("bvid") String bvid,
+                                 @Param("searchText") String searchText,
+                                 @Param("limit") int limit);
+
+    /**
      * 批量插入分片
      */
     int batchInsert(@Param("chunks") List<Chunk> chunks);

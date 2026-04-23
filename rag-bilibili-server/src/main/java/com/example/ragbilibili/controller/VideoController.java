@@ -2,6 +2,7 @@ package com.example.ragbilibili.controller;
 
 import com.example.ragbilibili.common.Result;
 import com.example.ragbilibili.dto.request.ImportVideoRequest;
+import com.example.ragbilibili.dto.request.RebuildVideoRequest;
 import com.example.ragbilibili.dto.response.VideoResponse;
 import com.example.ragbilibili.service.VideoService;
 import com.example.ragbilibili.util.UserContext;
@@ -23,6 +24,11 @@ public class VideoController {
     @PostMapping
     public Result<VideoResponse> importVideo(@Valid @RequestBody ImportVideoRequest request) {
         return Result.success(videoService.importVideo(request, UserContext.get()));
+    }
+
+    @PostMapping("/{id}/rebuild")
+    public Result<VideoResponse> rebuildVideo(@PathVariable Long id, @Valid @RequestBody RebuildVideoRequest request) {
+        return Result.success(videoService.rebuildVideo(id, request, UserContext.get()));
     }
 
     @GetMapping

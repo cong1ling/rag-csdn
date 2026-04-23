@@ -55,6 +55,7 @@ export async function consumeSseStream(response, handlers = {}) {
   let buffer = "";
   let started = false;
   let fullText = "";
+  let receivedExplicitEnd = false;
 
   const emitStart = async () => {
     if (started) {
@@ -100,6 +101,10 @@ export async function consumeSseStream(response, handlers = {}) {
         }
       }
 
+      if (parsed.event === "end") {
+        receivedExplicitEnd = true;
+      }
+
       const handler = handlers[parsed.event] || handlers.message;
       if (handler) {
         await handler(parsed.payload);
@@ -128,6 +133,9 @@ export async function consumeSseStream(response, handlers = {}) {
           }
         }
       } else {
+        if (parsed.event === "end") {
+          receivedExplicitEnd = true;
+        }
         const handler = handlers[parsed.event] || handlers.message;
         if (handler) {
           await handler(parsed.payload);
@@ -136,7 +144,7 @@ export async function consumeSseStream(response, handlers = {}) {
     }
   }
 
-  if (started && handlers.end) {
+  if (started && handlers.end && !receivedExplicitEnd) {
     await handlers.end({
       type: "end",
       synthetic: true,

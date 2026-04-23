@@ -128,6 +128,7 @@ class SessionControllerTest {
         response.setSessionType("SINGLE_VIDEO");
         response.setVideoId(1L);
         response.setVideoTitle("测试视频");
+        response.setConversationSummary("最近讨论了 Spring Boot 自动配置。");
 
         when(sessionService.getSession(1L, 1L)).thenReturn(response);
 
@@ -136,7 +137,8 @@ class SessionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
-                .andExpect(jsonPath("$.data.sessionType").value("SINGLE_VIDEO"));
+                .andExpect(jsonPath("$.data.sessionType").value("SINGLE_VIDEO"))
+                .andExpect(jsonPath("$.data.conversationSummary").value("最近讨论了 Spring Boot 自动配置。"));
     }
 
     @Test

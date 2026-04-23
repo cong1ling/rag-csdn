@@ -349,8 +349,8 @@ curl https://api.yourdomain.com/api/health
 **症状**：登录后立即退出
 
 **解决**：
-1. 确保前端 axios 配置了 `withCredentials: true`
-2. 确保后端 CORS 配置了 `setAllowCredentials(true)`
+1. 确保前端请求已正确携带 `Authorization: Bearer <token>`
+2. 确保后端与反向代理没有丢弃 `Authorization` 头
 3. 前后端必须都使用 HTTPS（或都使用 HTTP）
 
 ### 6.3 SSE 流式响应中断

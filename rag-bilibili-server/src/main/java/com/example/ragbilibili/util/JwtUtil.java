@@ -20,6 +20,12 @@ public class JwtUtil {
     public JwtUtil(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration}") long expiration) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalArgumentException("jwt.secret must not be blank.");
+        }
+        if (secret.startsWith("CHANGE_ME")) {
+            throw new IllegalArgumentException("jwt.secret must be replaced with a real secret value.");
+        }
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
             throw new IllegalArgumentException(

@@ -5,7 +5,17 @@ const DB_KEY = "rag-bilibili-dev-db";
 function nowString() {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(
+    now.getMinutes()
+  )}:${pad(now.getSeconds())}`;
+}
+
+function clampText(value, limit = 120) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
 }
 
 function createError(code, message) {
@@ -23,6 +33,21 @@ function createError(code, message) {
 function extractBvid(input) {
   const matched = String(input || "").match(/BV[a-zA-Z0-9]+/);
   return matched ? matched[0] : "";
+}
+
+function normalizeSession(session) {
+  return {
+    ...session,
+    conversationSummary: session?.conversationSummary ?? null,
+    summaryUpdateTime: session?.summaryUpdateTime ?? null,
+  };
+}
+
+function normalizeDatabase(db) {
+  return {
+    ...db,
+    sessions: (db.sessions || []).map((session) => normalizeSession(session)),
+  };
 }
 
 function defaultDatabase() {
@@ -70,6 +95,8 @@ function defaultDatabase() {
         videoId: 1,
         videoTitle: "Spring AI Alibaba 入门与 RAG 基础",
         createTime,
+        conversationSummary: "最近围绕 Spring AI Alibaba 的 RAG 入门链路进行讨论，重点包括字幕读取、文本切分和向量检索。",
+        summaryUpdateTime: createTime,
       },
       {
         id: 2,
@@ -77,6 +104,8 @@ function defaultDatabase() {
         videoId: null,
         videoTitle: null,
         createTime,
+        conversationSummary: "最近在全视频知识库范围内讨论删除联动，涉及主记录、分片、向量索引和关联会话的清理。",
+        summaryUpdateTime: createTime,
       },
     ],
     messages: {
@@ -121,7 +150,10 @@ function readDatabase() {
   }
 
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    const normalized = normalizeDatabase(parsed);
+    writeDatabase(normalized);
+    return normalized;
   } catch {
     const seeded = defaultDatabase();
     writeDatabase(seeded);
@@ -130,7 +162,7 @@ function readDatabase() {
 }
 
 function writeDatabase(db) {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  localStorage.setItem(DB_KEY, JSON.stringify(normalizeDatabase(db)));
 }
 
 function delay(ms = 220) {
@@ -139,13 +171,104 @@ function delay(ms = 220) {
   });
 }
 
-function buildAssistantReply(session, prompt) {
-  const baseReply =
+function classifyQueryIntent(prompt) {
+  const text = String(prompt || "").trim().toLowerCase();
+  const broadKeywords = ["总结", "对比", "全面", "整体", "分别", "所有", "有哪些方面", "系统介绍", "完整"];
+
+  if (!text || text.length <= 8 || /^(这个|那个|它|啥意思|什么意思)[^，。！？]*$/.test(text)) {
+    return "AMBIGUOUS";
+  }
+
+  if (text.length >= 24 || broadKeywords.some((keyword) => text.includes(keyword))) {
+    return "BROAD";
+  }
+
+  return "DIRECT";
+}
+
+function rewriteQuery(prompt, intent) {
+  const text = String(prompt || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (intent === "AMBIGUOUS") {
+    return `结合当前会话上下文，解释并补全这个问题的具体指向：${text}`;
+  }
+  if (intent === "BROAD") {
+    return `围绕以下问题拆成几个互补主题检索后再回答：${text}`;
+  }
+  return text;
+}
+
+function buildResponseMeta(session, prompt) {
+  const queryIntent = classifyQueryIntent(prompt);
+  const rewrittenQuery = rewriteQuery(prompt, queryIntent);
+  const existingSummary = Boolean(session.conversationSummary);
+  const conversationLength = (readDatabase().messages[session.id] || []).length;
+  const summaryUsed = existingSummary || conversationLength >= 4;
+
+  const baseMeta = {
+    DIRECT: { confidenceLabel: "HIGH", confidenceScore: 0.88, sourceCount: 5, knowledgeGap: false },
+    AMBIGUOUS: { confidenceLabel: "MEDIUM", confidenceScore: 0.66, sourceCount: 4, knowledgeGap: false },
+    BROAD: { confidenceLabel: "LOW", confidenceScore: 0.46, sourceCount: 3, knowledgeGap: true },
+  };
+
+  const exactnessKeywords = ["源码", "精确", "百分比", "哪一行", "具体时间", "原文"];
+  const needsExactness = exactnessKeywords.some((keyword) => String(prompt || "").includes(keyword));
+  const meta = { ...baseMeta[queryIntent] };
+
+  if (needsExactness) {
+    meta.confidenceScore = Math.max(0.28, meta.confidenceScore - 0.12);
+    meta.confidenceLabel = meta.confidenceScore >= 0.75 ? "HIGH" : meta.confidenceScore >= 0.55 ? "MEDIUM" : "LOW";
+    meta.knowledgeGap = true;
+  }
+
+  return {
+    queryIntent,
+    rewrittenQuery,
+    confidenceLabel: meta.confidenceLabel,
+    confidenceScore: meta.confidenceScore,
+    sourceCount: meta.sourceCount,
+    knowledgeGap: meta.knowledgeGap,
+    summaryUsed,
+  };
+}
+
+function buildAssistantReply(session, prompt, responseMeta) {
+  const scopeReply =
     session.sessionType === "SINGLE_VIDEO"
       ? "当前会话限定在单视频范围内，系统会按照 user_id 和 bvid 过滤相关字幕分片，再结合上下文组织回答。"
       : "当前会话限定在全部视频范围内，系统会按 user_id 检索当前用户导入的全部视频内容，再汇总生成答案。";
 
-  return `${baseReply} 你刚刚的问题是“${prompt}”。在开发模式下，这段回复来自前端本地 mock SSE 流。`;
+  const strategyReply =
+    responseMeta.queryIntent === "AMBIGUOUS"
+      ? "这次问题偏模糊，系统先做了问题补全。"
+      : responseMeta.queryIntent === "BROAD"
+        ? "这次问题范围较大，系统先拆成多个角度再检索。"
+        : "这次问题足够明确，系统直接进入检索。";
+
+  const confidenceReply =
+    responseMeta.confidenceLabel === "LOW"
+      ? "当前命中文档数量有限，结论更适合当作方向性参考。"
+      : responseMeta.confidenceLabel === "MEDIUM"
+        ? "当前回答基于有限上下文生成，建议继续追问关键点。"
+        : "当前回答基于较充分的命中内容生成。";
+
+  return `${scopeReply} ${strategyReply} 你刚刚的问题是“${prompt}”。${confidenceReply} 在开发模式下，这段回复来自前端本地 mock SSE 流。`;
+}
+
+function buildSessionSummary(session, prompt, reply) {
+  const scope = session.sessionType === "SINGLE_VIDEO" ? `围绕《${session.videoTitle || "当前视频"}》` : "围绕全视频知识库";
+  return `${scope}，最近讨论了“${clampText(prompt, 24)}”，AI 给出的重点是：${clampText(reply, 88)}`;
+}
+
+function updateSessionSummary(db, sessionId, prompt, reply) {
+  const session = db.sessions.find((item) => item.id === Number(sessionId));
+  if (!session) {
+    return;
+  }
+  session.conversationSummary = buildSessionSummary(session, prompt, reply);
+  session.summaryUpdateTime = nowString();
 }
 
 export const devServer = {
@@ -192,6 +315,31 @@ export const devServer = {
       throw createError(ERROR_CODES.VIDEO_NOT_FOUND, "视频不存在或已被删除。");
     }
     return video;
+  },
+
+  async rebuildVideo(id, payload) {
+    await delay();
+    const db = readDatabase();
+    const video = db.videos.find((item) => item.id === Number(id));
+    if (!video) {
+      throw createError(ERROR_CODES.VIDEO_NOT_FOUND, "视频不存在或已被删除。");
+    }
+    if (!payload?.sessdata || !payload?.biliJct || !payload?.buvid3) {
+      throw createError(ERROR_CODES.PARAM_ERROR, "请完整填写重建索引所需的 3 个凭证字段。");
+    }
+
+    video.status = "IMPORTING";
+    video.failReason = null;
+    video.importTime = nowString();
+    video.chunkCount = 32 + Math.floor(Math.random() * 24);
+    writeDatabase(db);
+
+    await delay(320);
+    video.status = "SUCCESS";
+    video.description = "该记录已通过开发模式重建索引，模拟了重新抓取字幕、重新切分与重新写入向量库。";
+    writeDatabase(db);
+
+    return { ...video };
   },
 
   async removeVideo(id) {
@@ -248,6 +396,8 @@ export const devServer = {
       videoId,
       videoTitle,
       createTime: nowString(),
+      conversationSummary: null,
+      summaryUpdateTime: null,
     };
 
     db.sessions.unshift(session);
@@ -316,7 +466,8 @@ export const devServer = {
       });
     }
 
-    const fullReply = buildAssistantReply(session, payload.content);
+    const responseMeta = buildResponseMeta(session, payload.content);
+    const fullReply = buildAssistantReply(session, payload.content, responseMeta);
     const chunks = fullReply.match(/.{1,9}/g) || [fullReply];
     let built = "";
 
@@ -344,6 +495,7 @@ export const devServer = {
       createTime: nowString(),
     };
     latestDb.messages[session.id] = [...(latestDb.messages[session.id] || []), assistantMessage];
+    updateSessionSummary(latestDb, session.id, payload.content, built);
     writeDatabase(latestDb);
 
     if (handlers.end) {
@@ -352,6 +504,7 @@ export const devServer = {
         userMessageId: userMessage.id,
         assistantMessageId: assistantMessage.id,
         fullContent: built,
+        ...responseMeta,
       });
     }
   },
