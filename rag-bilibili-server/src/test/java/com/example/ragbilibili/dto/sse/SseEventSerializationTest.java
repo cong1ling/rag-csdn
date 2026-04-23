@@ -28,11 +28,24 @@ class SseEventSerializationTest {
 
     @Test
     void shouldSerializeEndEventWithAssistantMessageIdAndFullContent() throws Exception {
-        JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(new SseEndEvent(22L, "完整回答")));
+        SseEndEvent event = new SseEndEvent(22L, "完整回答");
+        event.setQueryIntent("AMBIGUOUS");
+        event.setRewrittenQuery("Spring Boot 默认端口是什么");
+        event.setConfidenceLabel("LOW");
+        event.setConfidenceScore(0.34d);
+        event.setSourceCount(2);
+        event.setKnowledgeGap(true);
+        event.setSummaryUsed(true);
+
+        JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(event));
 
         assertEquals("end", json.get("type").asText());
         assertEquals(22L, json.get("assistantMessageId").asLong());
         assertEquals("完整回答", json.get("fullContent").asText());
+        assertEquals("AMBIGUOUS", json.get("queryIntent").asText());
+        assertEquals("LOW", json.get("confidenceLabel").asText());
+        assertEquals(2, json.get("sourceCount").asInt());
+        assertEquals(true, json.get("knowledgeGap").asBoolean());
     }
 
     @Test
