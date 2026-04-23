@@ -3,6 +3,7 @@ package com.example.ragbilibili.util;
 import com.example.ragbilibili.config.ChunkingProperties;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ public class ChunkDocumentSplitter {
     private final TokenTextSplitter delegate;
     private final int overlapChars;
 
+    @Autowired
     public ChunkDocumentSplitter(ChunkingProperties properties) {
         this(new TokenTextSplitter(
                 properties.getChunkSize(),
