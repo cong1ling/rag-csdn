@@ -1,6 +1,5 @@
 package com.example.ragbilibili.dto.sse;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -9,7 +8,6 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class SseStartEvent {
     private String type = "start";
     private Long userMessageId;
