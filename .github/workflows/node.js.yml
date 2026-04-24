@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./rag-bilibili-front
+        working-directory: ./rag-csdn-front
 
     steps:
     - uses: actions/checkout@v4
@@ -21,11 +21,12 @@ jobs:
       with:
         node-version: 20.x
         cache: 'npm'
-        cache-dependency-path: ./rag-bilibili-front/package-lock.json
+        cache-dependency-path: ./rag-csdn-front/package-lock.json
 
     - name: Install dependencies
       run: npm ci
 
     - name: Build
       run: npm run build
+
 

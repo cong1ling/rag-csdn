@@ -1,6 +1,12 @@
 # 快速部署指南
 
-本指南帮助你在 30 分钟内完成 RAG-Bilibili 的部署。
+本指南帮助你在 30 分钟内完成当前项目的部署。
+
+说明：
+
+- 仓库目录名仍为 `rag-bilibili`
+- 当前后端业务已切换为 CSDN 文章 RAG
+- 后端主接口已切换为 `/api/articles`
 
 ## 前置条件
 
@@ -42,10 +48,10 @@ sudo apt install nginx certbot python3-certbot-nginx -y
 
 ```bash
 # 在服务器上创建目录
-mkdir -p /home/ubuntu/rag-bilibili-server
+mkdir -p /home/ubuntu/rag-csdn-server
 
 # 在本地修改配置文件
-# 编辑 deployment/rag-bilibili.service，填入实际的：
+# 编辑 deployment/rag-csdn.service，填入实际的：
 # - 数据库密码
 # - OPENAI_API_KEY
 # - DASHSCOPE_API_KEY
@@ -54,29 +60,29 @@ mkdir -p /home/ubuntu/rag-bilibili-server
 # - CORS_ALLOWED_ORIGINS（你的 Cloudflare Pages 域名）
 
 # 上传配置文件到服务器
-scp deployment/rag-bilibili.service ubuntu@your-server-ip:/tmp/
-ssh ubuntu@your-server-ip "sudo mv /tmp/rag-bilibili.service /etc/systemd/system/"
+scp deployment/rag-csdn.service ubuntu@your-server-ip:/tmp/
+ssh ubuntu@your-server-ip "sudo mv /tmp/rag-csdn.service /etc/systemd/system/"
 ```
 
 ### 第三步：部署后端（5分钟）
 
 ```bash
 # 在本地项目根目录运行
-cd rag-bilibili-server
+cd rag-csdn-server
 mvn clean package -DskipTests
 
 # 上传 JAR 包到服务器
-scp target/rag-bilibili-server-1.0.0.jar ubuntu@your-server-ip:/home/ubuntu/rag-bilibili-server/
+scp target/rag-csdn-server-1.0.0.jar ubuntu@your-server-ip:/home/ubuntu/rag-csdn-server/
 
 # 在服务器上启动服务
 ssh ubuntu@your-server-ip
 sudo systemctl daemon-reload
-sudo systemctl enable rag-bilibili
-sudo systemctl start rag-bilibili
-sudo systemctl status rag-bilibili
+sudo systemctl enable rag-csdn
+sudo systemctl start rag-csdn
+sudo systemctl status rag-csdn
 
 # 查看日志确认启动成功
-sudo journalctl -u rag-bilibili -f
+sudo journalctl -u rag-csdn -f
 ```
 
 ### 第四步：配置 Nginx 和 HTTPS（5分钟）
@@ -89,11 +95,11 @@ sudo journalctl -u rag-bilibili -f
 
 # 上传 Nginx 配置
 scp deployment/nginx.conf ubuntu@your-server-ip:/tmp/
-ssh ubuntu@your-server-ip "sudo mv /tmp/nginx.conf /etc/nginx/sites-available/rag-bilibili"
+ssh ubuntu@your-server-ip "sudo mv /tmp/nginx.conf /etc/nginx/sites-available/rag-csdn"
 
 # 启用配置
 ssh ubuntu@your-server-ip
-sudo ln -s /etc/nginx/sites-available/rag-bilibili /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/rag-csdn /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 
@@ -110,8 +116,8 @@ sudo certbot --nginx -d api.yourdomain.com
 3. 进入 **Pages** → **Create a project**
 4. 连接 GitHub 仓库
 5. 配置构建设置：
-   - **Build command**: `cd rag-bilibili-front && npm install && npm run build`
-   - **Build output directory**: `rag-bilibili-front/dist`
+   - **Build command**: `cd rag-csdn-front && npm install && npm run build`
+   - **Build output directory**: `rag-csdn-front/dist`
    - **Environment variables**:
      - `VITE_API_BASE_URL` = `https://api.yourdomain.com/api`
 6. 点击 **Save and Deploy**
@@ -126,7 +132,7 @@ npm install -g wrangler
 wrangler login
 
 # 创建 .env.production
-cd rag-bilibili-front
+cd rag-csdn-front
 cat > .env.production << EOF
 VITE_API_BASE_URL=https://api.yourdomain.com/api
 EOF
@@ -134,7 +140,7 @@ EOF
 # 构建并部署
 npm install
 npm run build
-wrangler pages deploy dist --project-name=rag-bilibili
+wrangler pages deploy dist --project-name=rag-csdn
 ```
 
 ### 第六步：验证部署（5分钟）
@@ -148,7 +154,7 @@ wrangler pages deploy dist --project-name=rag-bilibili
    - 打开浏览器访问 `https://your-app.pages.dev`
    - 注册账号
    - 登录系统
-   - 导入视频测试
+   - 导入文章测试
 
 3. **检查 CORS**
    - 打开浏览器开发者工具（F12）
@@ -161,13 +167,13 @@ wrangler pages deploy dist --project-name=rag-bilibili
 ```bash
 # 检查后端 CORS 配置
 ssh ubuntu@your-server-ip
-sudo journalctl -u rag-bilibili | grep CORS
+sudo journalctl -u rag-csdn | grep CORS
 
 # 检查 Nginx CORS 配置
-sudo cat /etc/nginx/sites-available/rag-bilibili | grep -A 5 "Access-Control"
+sudo cat /etc/nginx/sites-available/rag-csdn | grep -A 5 "Access-Control"
 
 # 重启服务
-sudo systemctl restart rag-bilibili
+sudo systemctl restart rag-csdn
 sudo systemctl restart nginx
 ```
 
@@ -183,7 +189,7 @@ sudo systemctl restart nginx
 ```bash
 # 检查 Nginx 配置
 ssh ubuntu@your-server-ip
-sudo cat /etc/nginx/sites-available/rag-bilibili | grep -A 3 "proxy_buffering"
+sudo cat /etc/nginx/sites-available/rag-csdn | grep -A 3 "proxy_buffering"
 
 # 应该包含：
 # proxy_buffering off;
@@ -212,13 +218,13 @@ chmod +x deployment/deploy-all.sh
 
 ```bash
 # 查看后端日志
-ssh ubuntu@your-server-ip 'sudo journalctl -u rag-bilibili -f'
+ssh ubuntu@your-server-ip 'sudo journalctl -u rag-csdn -f'
 
 # 查看 Nginx 日志
 ssh ubuntu@your-server-ip 'sudo tail -f /var/log/nginx/access.log'
 
 # 重启服务
-ssh ubuntu@your-server-ip 'sudo systemctl restart rag-bilibili'
+ssh ubuntu@your-server-ip 'sudo systemctl restart rag-csdn'
 
 # 备份数据库
 ssh ubuntu@your-server-ip '/home/ubuntu/backup-db.sh'
@@ -234,3 +240,4 @@ ssh ubuntu@your-server-ip '/home/ubuntu/backup-db.sh'
 ## 需要帮助？
 
 查看完整文档：`DEPLOYMENT.md`
+

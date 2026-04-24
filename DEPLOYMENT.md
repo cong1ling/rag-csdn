@@ -1,4 +1,10 @@
-# RAG-Bilibili 部署指南
+# RAG-CSDN 部署指南
+
+说明：
+
+- 仓库目录名和部分部署文件名仍保留 `rag-bilibili`
+- 当前后端业务已切换为 CSDN 文章 RAG
+- 后端主接口已切换为 `/api/articles`
 
 ## 架构说明
 
@@ -52,18 +58,18 @@ EXIT;
 
 ### 1.3 配置环境变量
 
-创建 `/etc/systemd/system/rag-bilibili.service`：
+创建 `/etc/systemd/system/rag-csdn.service`：
 
 ```ini
 [Unit]
-Description=RAG Bilibili Server
+Description=RAG CSDN Server
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/rag-bilibili-server
-ExecStart=/usr/bin/java -jar /home/ubuntu/rag-bilibili-server/rag-bilibili-server-1.0.0.jar
+WorkingDirectory=/home/ubuntu/rag-csdn-server
+ExecStart=/usr/bin/java -jar /home/ubuntu/rag-csdn-server/rag-csdn-server-1.0.0.jar
 Restart=on-failure
 RestartSec=10
 
@@ -85,26 +91,26 @@ WantedBy=multi-user.target
 
 在本地构建：
 ```bash
-cd rag-bilibili-server
+cd rag-csdn-server
 mvn clean package -DskipTests
 ```
 
 上传到服务器：
 ```bash
-scp target/rag-bilibili-server-1.0.0.jar ubuntu@your-server-ip:/home/ubuntu/rag-bilibili-server/
+scp target/rag-csdn-server-1.0.0.jar ubuntu@your-server-ip:/home/ubuntu/rag-csdn-server/
 ```
 
 启动服务：
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable rag-bilibili
-sudo systemctl start rag-bilibili
-sudo systemctl status rag-bilibili
+sudo systemctl enable rag-csdn
+sudo systemctl start rag-csdn
+sudo systemctl status rag-csdn
 ```
 
 查看日志：
 ```bash
-sudo journalctl -u rag-bilibili -f
+sudo journalctl -u rag-csdn -f
 ```
 
 ### 1.5 配置 Nginx 反向代理
@@ -114,7 +120,7 @@ sudo journalctl -u rag-bilibili -f
 sudo apt install nginx -y
 ```
 
-创建配置文件 `/etc/nginx/sites-available/rag-bilibili`：
+创建配置文件 `/etc/nginx/sites-available/rag-csdn`：
 
 ```nginx
 server {
@@ -151,7 +157,7 @@ server {
 
 启用配置：
 ```bash
-sudo ln -s /etc/nginx/sites-available/rag-bilibili /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/rag-csdn /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -174,7 +180,7 @@ Certbot 会自动修改 Nginx 配置并添加 SSL 证书。
 创建 `.env.production` 文件：
 
 ```bash
-cd rag-bilibili-front
+cd rag-csdn-front
 cat > .env.production << EOF
 VITE_API_BASE_URL=https://api.yourdomain.com/api
 EOF
@@ -199,8 +205,8 @@ npm run build
 4. 连接你的 Git 仓库
 5. 配置构建设置：
    - **Framework preset**: Vue
-   - **Build command**: `cd rag-bilibili-front && npm install && npm run build`
-   - **Build output directory**: `rag-bilibili-front/dist`
+   - **Build command**: `cd rag-csdn-front && npm install && npm run build`
+   - **Build output directory**: `rag-csdn-front/dist`
    - **Root directory**: `/`
    - **Environment variables**:
      - `VITE_API_BASE_URL` = `https://api.yourdomain.com/api`
@@ -217,9 +223,9 @@ npm install -g wrangler
 wrangler login
 
 # 部署
-cd rag-bilibili-front
+cd rag-csdn-front
 npm run build
-wrangler pages deploy dist --project-name=rag-bilibili
+wrangler pages deploy dist --project-name=rag-csdn
 ```
 
 ### 2.4 配置自定义域名
@@ -236,10 +242,10 @@ wrangler pages deploy dist --project-name=rag-bilibili
 
 ### 3.1 创建 CORS 配置类
 
-在后端项目中创建 `src/main/java/com/example/ragbilibili/config/CorsConfig.java`：
+在后端项目中创建 `src/main/java/com/example/ragcsdn/config/CorsConfig.java`：
 
 ```java
-package com.example.ragbilibili.config;
+package com.example.ragcsdn.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -276,7 +282,7 @@ public class CorsConfig {
 
 ### 3.2 更新 Nginx 配置
 
-修改 `/etc/nginx/sites-available/rag-bilibili`，将 CORS 头中的域名替换为实际的 Cloudflare Pages 域名：
+修改 `/etc/nginx/sites-available/rag-csdn`，将 CORS 头中的域名替换为实际的 Cloudflare Pages 域名：
 
 ```nginx
 add_header 'Access-Control-Allow-Origin' 'https://your-app.pages.dev' always;
@@ -327,7 +333,7 @@ curl https://api.yourdomain.com/api/health
 
 1. 注册账号
 2. 登录
-3. 导入视频
+3. 导入文章
 4. 创建会话
 5. 发送消息
 
@@ -369,7 +375,7 @@ curl https://api.yourdomain.com/api/health
 
 ```bash
 # 后端日志
-sudo journalctl -u rag-bilibili -f
+sudo journalctl -u rag-csdn -f
 
 # Nginx 日志
 sudo tail -f /var/log/nginx/access.log
@@ -425,15 +431,15 @@ crontab -e
 
 ```bash
 # 本地构建
-cd rag-bilibili-server
+cd rag-csdn-server
 mvn clean package -DskipTests
 
 # 上传到服务器
-scp target/rag-bilibili-server-1.0.0.jar ubuntu@your-server-ip:/home/ubuntu/rag-bilibili-server/
+scp target/rag-csdn-server-1.0.0.jar ubuntu@your-server-ip:/home/ubuntu/rag-csdn-server/
 
 # 重启服务
 ssh ubuntu@your-server-ip
-sudo systemctl restart rag-bilibili
+sudo systemctl restart rag-csdn
 ```
 
 ### 更新前端
@@ -442,7 +448,8 @@ sudo systemctl restart rag-bilibili
 
 如果使用手动部署：
 ```bash
-cd rag-bilibili-front
+cd rag-csdn-front
 npm run build
-wrangler pages deploy dist --project-name=rag-bilibili
+wrangler pages deploy dist --project-name=rag-csdn
 ```
+

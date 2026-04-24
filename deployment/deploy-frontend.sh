@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# RAG-Bilibili 前端部署脚本（Cloudflare Pages）
+# RAG-CSDN 前端部署脚本（Cloudflare Pages）
 # 使用方法：chmod +x deploy-frontend.sh && ./deploy-frontend.sh
 
 set -e
 
 echo "=========================================="
-echo "RAG-Bilibili 前端部署脚本"
+echo "RAG-CSDN 前端部署脚本"
 echo "=========================================="
 
 # 检查是否在项目根目录
-if [ ! -d "rag-bilibili-front" ]; then
+if [ ! -d "rag-csdn-front" ]; then
     echo "错误：请在项目根目录运行此脚本"
     exit 1
 fi
@@ -31,7 +31,7 @@ fi
 # 1. 安装依赖
 echo ""
 echo "步骤 1/3: 安装依赖..."
-cd rag-bilibili-front
+cd rag-csdn-front
 npm install
 echo "✓ 依赖安装完成"
 
@@ -48,7 +48,7 @@ echo "✓ 构建成功"
 # 3. 部署到 Cloudflare Pages
 echo ""
 echo "步骤 3/3: 部署到 Cloudflare Pages..."
-wrangler pages deploy dist --project-name=rag-bilibili
+wrangler pages deploy dist --project-name=rag-csdn
 
 echo ""
 echo "=========================================="
@@ -56,5 +56,6 @@ echo "部署完成！"
 echo "=========================================="
 echo ""
 echo "访问你的应用："
-echo "  https://rag-bilibili.pages.dev"
+echo "  https://rag-csdn.pages.dev"
 echo ""
+

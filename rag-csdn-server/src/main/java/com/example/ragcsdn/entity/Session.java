@@ -1,0 +1,46 @@
+package com.example.ragcsdn.entity;
+
+import lombok.Data;
+import java.time.LocalDateTime;
+
+/**
+ * 会话实体类
+ */
+@Data
+public class Session {
+    /**
+     * 会话主键
+     */
+    private Long id;
+
+    /**
+     * 用户 ID
+     */
+    private Long userId;
+
+    /**
+     * 会话类型
+     */
+    private String sessionType;
+
+    /**
+     * 关联文章 ID（可为空）
+     */
+    private Long articleId;
+
+    /**
+     * 创建时间
+     */
+    private LocalDateTime createTime;
+
+    /**
+     * 对话摘要
+     */
+    private String conversationSummary;
+
+    /**
+     * 摘要更新时间
+     */
+    private LocalDateTime summaryUpdateTime;
+}
+

@@ -20,4 +20,5 @@ jobs:
         cache: maven
 
     - name: Build with Maven
-      run: mvn -B package --file rag-bilibili-server/pom.xml
+      run: mvn -B package --file rag-csdn-server/pom.xml
+

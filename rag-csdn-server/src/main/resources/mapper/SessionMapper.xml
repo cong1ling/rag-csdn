@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.ragcsdn.mapper.SessionMapper">
+
+    <resultMap id="BaseResultMap" type="com.example.ragcsdn.entity.Session">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="session_type" property="sessionType"/>
+        <result column="article_id" property="articleId"/>
+        <result column="create_time" property="createTime"/>
+        <result column="conversation_summary" property="conversationSummary"/>
+        <result column="summary_update_time" property="summaryUpdateTime"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT id, user_id, session_type, article_id, create_time, conversation_summary, summary_update_time
+        FROM session
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT id, user_id, session_type, article_id, create_time, conversation_summary, summary_update_time
+        FROM session
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectIdsByArticleId" resultType="long">
+        SELECT id
+        FROM session
+        WHERE article_id = #{articleId}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO session (user_id, session_type, article_id, create_time, conversation_summary, summary_update_time)
+        VALUES (#{userId}, #{sessionType}, #{articleId}, #{createTime}, #{conversationSummary}, #{summaryUpdateTime})
+    </insert>
+
+    <update id="updateSummary">
+        UPDATE session
+        SET conversation_summary = #{conversationSummary},
+            summary_update_time = #{summaryUpdateTime}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM session WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByArticleId">
+        DELETE FROM session WHERE article_id = #{articleId}
+    </delete>
+
+</mapper>
+

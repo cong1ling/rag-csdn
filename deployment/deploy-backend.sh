@@ -1,22 +1,22 @@
 #!/bin/bash
 
-# RAG-Bilibili 后端部署脚本
+# RAG-CSDN 后端部署脚本
 # 使用方法：chmod +x deploy-backend.sh && ./deploy-backend.sh
 
 set -e
 
 echo "=========================================="
-echo "RAG-Bilibili 后端部署脚本"
+echo "RAG-CSDN 后端部署脚本"
 echo "=========================================="
 
 # 配置变量
 SERVER_USER="ubuntu"
 SERVER_HOST="your-server-ip"
-SERVER_PATH="/home/ubuntu/rag-bilibili-server"
-JAR_NAME="rag-bilibili-server-1.0.0.jar"
+SERVER_PATH="/home/ubuntu/rag-csdn-server"
+JAR_NAME="rag-csdn-server-1.0.0.jar"
 
 # 检查是否在项目根目录
-if [ ! -d "rag-bilibili-server" ]; then
+if [ ! -d "rag-csdn-server" ]; then
     echo "错误：请在项目根目录运行此脚本"
     exit 1
 fi
@@ -24,7 +24,7 @@ fi
 # 1. 构建项目
 echo ""
 echo "步骤 1/4: 构建项目..."
-cd rag-bilibili-server
+cd rag-csdn-server
 mvn clean package -DskipTests
 if [ $? -ne 0 ]; then
     echo "构建失败！"
@@ -54,9 +54,9 @@ echo "✓ 上传成功"
 echo ""
 echo "步骤 4/4: 重启服务..."
 ssh ${SERVER_USER}@${SERVER_HOST} "
-    sudo systemctl restart rag-bilibili
+    sudo systemctl restart rag-csdn
     sleep 3
-    sudo systemctl status rag-bilibili --no-pager
+    sudo systemctl status rag-csdn --no-pager
 "
 
 echo ""
@@ -65,8 +65,9 @@ echo "部署完成！"
 echo "=========================================="
 echo ""
 echo "查看日志："
-echo "  ssh ${SERVER_USER}@${SERVER_HOST} 'sudo journalctl -u rag-bilibili -f'"
+echo "  ssh ${SERVER_USER}@${SERVER_HOST} 'sudo journalctl -u rag-csdn -f'"
 echo ""
 echo "检查服务状态："
-echo "  ssh ${SERVER_USER}@${SERVER_HOST} 'sudo systemctl status rag-bilibili'"
+echo "  ssh ${SERVER_USER}@${SERVER_HOST} 'sudo systemctl status rag-csdn'"
 echo ""
+

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.ragcsdn.mapper.ArticleMapper">
+
+    <resultMap id="BaseResultMap" type="com.example.ragcsdn.entity.Article">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="source_id" property="sourceId"/>
+        <result column="source_url" property="sourceUrl"/>
+        <result column="title" property="title"/>
+        <result column="description" property="description"/>
+        <result column="import_time" property="importTime"/>
+        <result column="status" property="status"/>
+        <result column="fail_reason" property="failReason"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT id, user_id, source_id, source_url, title, description, import_time, status, fail_reason
+        FROM article
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserIdAndSourceId" resultMap="BaseResultMap">
+        SELECT id, user_id, source_id, source_url, title, description, import_time, status, fail_reason
+        FROM article
+        WHERE user_id = #{userId} AND source_id = #{sourceId}
+    </select>
+
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT id, user_id, source_id, source_url, title, description, import_time, status, fail_reason
+        FROM article
+        WHERE user_id = #{userId}
+        ORDER BY import_time DESC
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO article (user_id, source_id, source_url, title, description, import_time, status, fail_reason)
+        VALUES (#{userId}, #{sourceId}, #{sourceUrl}, #{title}, #{description}, #{importTime}, #{status}, #{failReason})
+    </insert>
+
+    <update id="update">
+        UPDATE article
+        SET source_url = #{sourceUrl},
+            title = #{title},
+            description = #{description},
+            status = #{status},
+            fail_reason = #{failReason}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM article WHERE id = #{id}
+    </delete>
+
+</mapper>
+
