@@ -1,243 +1,163 @@
-# 快速部署指南
+# 本地快速启动
 
-本指南帮助你在 30 分钟内完成当前项目的部署。
+本指南面向本地开发、自测联调和功能验收，不涉及生产部署。
 
 说明：
 
-- 仓库目录名仍为 `rag-bilibili`
-- 当前后端业务已切换为 CSDN 文章 RAG
-- 后端主接口已切换为 `/api/articles`
+- 当前业务域已经迁移为 **CSDN 文章 RAG**
+- 后端主接口为 `/api/articles`
+- 前端主页面为 `/articles`
 
-## 前置条件
+## 1. 前置条件
 
-- 阿里云 ECS 服务器（2核4G，Ubuntu 22.04）
-- 阿里云 RDS MySQL 或自建 MySQL
-- 阿里云 DashVector 向量数据库
-- Cloudflare 账号
-- 域名（已备案）
+本地建议准备以下环境：
 
-## 快速部署步骤
+- Java 17+
+- Maven 3.6+
+- Node.js 18+
+- npm 9+
+- MySQL 8.0+
+- 可用的 OpenAI 兼容聊天模型服务
+- 阿里云 DashScope API Key
+- 阿里云 DashVector 实例
 
-### 第一步：准备后端服务器（10分钟）
+## 2. 启动后端
 
-```bash
-# SSH 登录到阿里云 ECS
-ssh ubuntu@your-server-ip
+进入后端目录：
 
-# 安装 Java 17
-sudo apt update && sudo apt upgrade -y
-sudo apt install openjdk-17-jdk -y
-
-# 安装 MySQL（如果不使用 RDS）
-sudo apt install mysql-server -y
-sudo mysql_secure_installation
-
-# 创建数据库
-sudo mysql -u root -p
-CREATE DATABASE rag_bilibili CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'raguser'@'%' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON rag_bilibili.* TO 'raguser'@'%';
-FLUSH PRIVILEGES;
-EXIT;
-
-# 安装 Nginx
-sudo apt install nginx certbot python3-certbot-nginx -y
-```
-
-### 第二步：配置后端服务（5分钟）
-
-```bash
-# 在服务器上创建目录
-mkdir -p /home/ubuntu/rag-csdn-server
-
-# 在本地修改配置文件
-# 编辑 deployment/rag-csdn.service，填入实际的：
-# - 数据库密码
-# - OPENAI_API_KEY
-# - DASHSCOPE_API_KEY
-# - DASHVECTOR_API_KEY
-# - DASHVECTOR_ENDPOINT
-# - CORS_ALLOWED_ORIGINS（你的 Cloudflare Pages 域名）
-
-# 上传配置文件到服务器
-scp deployment/rag-csdn.service ubuntu@your-server-ip:/tmp/
-ssh ubuntu@your-server-ip "sudo mv /tmp/rag-csdn.service /etc/systemd/system/"
-```
-
-### 第三步：部署后端（5分钟）
-
-```bash
-# 在本地项目根目录运行
+```powershell
 cd rag-csdn-server
-mvn clean package -DskipTests
-
-# 上传 JAR 包到服务器
-scp target/rag-csdn-server-1.0.0.jar ubuntu@your-server-ip:/home/ubuntu/rag-csdn-server/
-
-# 在服务器上启动服务
-ssh ubuntu@your-server-ip
-sudo systemctl daemon-reload
-sudo systemctl enable rag-csdn
-sudo systemctl start rag-csdn
-sudo systemctl status rag-csdn
-
-# 查看日志确认启动成功
-sudo journalctl -u rag-csdn -f
 ```
 
-### 第四步：配置 Nginx 和 HTTPS（5分钟）
+当前后端依赖以下环境变量，建议配置到系统环境变量、IDE 运行配置，或启动终端会话中：
 
-```bash
-# 在本地修改 Nginx 配置
-# 编辑 deployment/nginx.conf，将以下内容替换为实际值：
-# - api.yourdomain.com（你的后端域名）
-# - your-app.pages.dev（你的 Cloudflare Pages 域名）
-
-# 上传 Nginx 配置
-scp deployment/nginx.conf ubuntu@your-server-ip:/tmp/
-ssh ubuntu@your-server-ip "sudo mv /tmp/nginx.conf /etc/nginx/sites-available/rag-csdn"
-
-# 启用配置
-ssh ubuntu@your-server-ip
-sudo ln -s /etc/nginx/sites-available/rag-csdn /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
-
-# 配置 HTTPS 证书
-sudo certbot --nginx -d api.yourdomain.com
+```env
+DB_USERNAME=root
+DB_PASSWORD=123456
+JWT_SECRET=replace_with_a_long_random_secret
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_BASE_URL=https://api.openai.com
+DASHSCOPE_API_KEY=your_dashscope_api_key
+DASHVECTOR_API_KEY=your_dashvector_api_key
+DASHVECTOR_ENDPOINT=your_dashvector_endpoint
+CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 
-### 第五步：部署前端到 Cloudflare Pages（5分钟）
+说明：
 
-#### 方式 A：通过 Git 自动部署（推荐）
+- 默认数据库连接指向 `rag_csdn`
+- JDBC URL 已开启 `createDatabaseIfNotExist=true`，若当前账号没有建库权限，请先手动创建数据库
+- Flyway 会自动执行迁移，新库会直接落到 `article / chunk / vector_mapping / session / message` 结构
 
-1. 将代码推送到 GitHub
-2. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
-3. 进入 **Pages** → **Create a project**
-4. 连接 GitHub 仓库
-5. 配置构建设置：
-   - **Build command**: `cd rag-csdn-front && npm install && npm run build`
-   - **Build output directory**: `rag-csdn-front/dist`
-   - **Environment variables**:
-     - `VITE_API_BASE_URL` = `https://api.yourdomain.com/api`
-6. 点击 **Save and Deploy**
+启动命令：
 
-#### 方式 B：使用 CLI 手动部署
+```powershell
+mvn spring-boot:run
+```
 
-```bash
-# 安装 Wrangler CLI
-npm install -g wrangler
+默认访问地址：
 
-# 登录 Cloudflare
-wrangler login
+```text
+http://localhost:8080
+```
 
-# 创建 .env.production
+可选联调页：
+
+```text
+http://localhost:8080/dev.html
+```
+
+## 3. 启动前端
+
+打开第二个终端，进入前端目录：
+
+```powershell
 cd rag-csdn-front
-cat > .env.production << EOF
-VITE_API_BASE_URL=https://api.yourdomain.com/api
-EOF
+```
 
-# 构建并部署
+复制前端环境变量模板：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+如使用 Bash，可执行：
+
+```bash
+cp .env.example .env
+```
+
+默认前端环境变量如下：
+
+```env
+VITE_API_BASE_URL=/api
+VITE_PROXY_TARGET=http://localhost:8080
+```
+
+安装依赖并启动：
+
+```powershell
 npm install
-npm run build
-wrangler pages deploy dist --project-name=rag-csdn
+npm run dev
 ```
 
-### 第六步：验证部署（5分钟）
+默认访问地址：
 
-1. **测试后端 API**
-   ```bash
-   curl https://api.yourdomain.com/api/auth/login
-   ```
-
-2. **访问前端**
-   - 打开浏览器访问 `https://your-app.pages.dev`
-   - 注册账号
-   - 登录系统
-   - 导入文章测试
-
-3. **检查 CORS**
-   - 打开浏览器开发者工具（F12）
-   - 查看 Network 标签，确认没有 CORS 错误
-
-## 常见问题快速修复
-
-### 问题 1：CORS 错误
-
-```bash
-# 检查后端 CORS 配置
-ssh ubuntu@your-server-ip
-sudo journalctl -u rag-csdn | grep CORS
-
-# 检查 Nginx CORS 配置
-sudo cat /etc/nginx/sites-available/rag-csdn | grep -A 5 "Access-Control"
-
-# 重启服务
-sudo systemctl restart rag-csdn
-sudo systemctl restart nginx
+```text
+http://localhost:5173
 ```
 
-### 问题 2：无法登录（JWT / 鉴权问题）
+## 4. 本地联调链路
 
-确保：
-1. 前后端都使用 HTTPS
-2. 前端请求头已正确携带 `Authorization: Bearer <token>`
-3. 后端未被反向代理、CORS 或网关策略拦掉 `Authorization` 头
+启动完成后，默认联调链路如下：
 
-### 问题 3：SSE 流式响应中断
+1. 浏览器访问 `http://localhost:5173`
+2. 前端把 `/api/*` 请求代理到 `http://localhost:8080`
+3. 登录成功后，前端把 JWT 保存在 `localStorage`
+4. 后续请求通过 `Authorization: Bearer <token>` 访问后端
+5. 聊天接口通过 SSE 持续接收流式回答
 
-```bash
-# 检查 Nginx 配置
-ssh ubuntu@your-server-ip
-sudo cat /etc/nginx/sites-available/rag-csdn | grep -A 3 "proxy_buffering"
+## 5. 启动后验证
 
-# 应该包含：
-# proxy_buffering off;
-# proxy_cache off;
-```
+可以按下面的顺序快速验证：
 
-## 使用自动化脚本
+1. 打开首页，确认页面可正常加载
+2. 注册并登录账号
+3. 进入 `/import` 导入一篇 CSDN 文章
+4. 进入 `/articles` 查看导入状态与分片数量
+5. 创建会话并在 `/chat/:sessionId` 验证流式问答
 
-后续更新可以使用自动化脚本：
+## 6. 常见问题
 
-```bash
-# 部署后端
-chmod +x deployment/deploy-backend.sh
-./deployment/deploy-backend.sh
+### 6.1 后端启动失败
 
-# 部署前端
-chmod +x deployment/deploy-frontend.sh
-./deployment/deploy-frontend.sh
+优先检查：
 
-# 一键部署
-chmod +x deployment/deploy-all.sh
-./deployment/deploy-all.sh
-```
+- MySQL 是否可连接
+- `JWT_SECRET` 是否已配置
+- `OPENAI_API_KEY`、`DASHSCOPE_API_KEY`、`DASHVECTOR_*` 是否已配置
+- DashVector Collection `csdn` 是否已准备完成
 
-## 监控和维护
+### 6.2 前端能打开，但接口全部失败
 
-```bash
-# 查看后端日志
-ssh ubuntu@your-server-ip 'sudo journalctl -u rag-csdn -f'
+优先检查：
 
-# 查看 Nginx 日志
-ssh ubuntu@your-server-ip 'sudo tail -f /var/log/nginx/access.log'
+- 后端是否运行在 `8080`
+- `.env` 中的 `VITE_PROXY_TARGET` 是否正确
+- 浏览器请求头里是否带上了 `Authorization: Bearer <token>`
+- 后端 `CORS_ALLOWED_ORIGINS` 是否包含 `http://localhost:5173`
 
-# 重启服务
-ssh ubuntu@your-server-ip 'sudo systemctl restart rag-csdn'
+### 6.3 聊天没有流式输出
 
-# 备份数据库
-ssh ubuntu@your-server-ip '/home/ubuntu/backup-db.sh'
-```
+优先检查：
 
-## 下一步
+- `POST /api/sessions/{sessionId}/messages/stream` 是否可访问
+- OpenAI 兼容模型服务是否可连通
+- 浏览器控制台是否有鉴权或网络错误
 
-- 配置自定义域名（在 Cloudflare Pages 设置中）
-- 设置数据库自动备份（crontab）
-- 配置监控告警（阿里云监控）
-- 优化性能（CDN、缓存等）
+## 7. 文档索引
 
-## 需要帮助？
-
-查看完整文档：`DEPLOYMENT.md`
+- 后端启动说明：`rag-csdn-server/后端启动配置文档.md`
+- 前端启动说明：`rag-csdn-front/前端快速启动文档.md`
+- 部署说明：`DEPLOYMENT.md`
 

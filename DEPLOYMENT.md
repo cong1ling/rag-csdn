@@ -2,7 +2,6 @@
 
 说明：
 
-- 仓库目录名和部分部署文件名仍保留 `rag-bilibili`
 - 当前后端业务已切换为 CSDN 文章 RAG
 - 后端主接口已切换为 `/api/articles`
 
@@ -49,9 +48,9 @@ sudo mysql_secure_installation
 sudo mysql -u root -p
 
 # 创建数据库和用户
-CREATE DATABASE rag_bilibili CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE rag_csdn CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'raguser'@'%' IDENTIFIED BY 'your_strong_password';
-GRANT ALL PRIVILEGES ON rag_bilibili.* TO 'raguser'@'%';
+GRANT ALL PRIVILEGES ON rag_csdn.* TO 'raguser'@'%';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -81,7 +80,7 @@ Environment="OPENAI_BASE_URL=https://api.deepseek.com"
 Environment="DASHSCOPE_API_KEY=sk-xxx"
 Environment="DASHVECTOR_API_KEY=xxx"
 Environment="DASHVECTOR_ENDPOINT=xxx"
-Environment="SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/rag_bilibili?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai"
+Environment="SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/rag_csdn?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai"
 
 [Install]
 WantedBy=multi-user.target
@@ -389,7 +388,7 @@ sudo tail -f /var/log/nginx/error.log
 ```bash
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-mysqldump -u raguser -p'your_password' rag_bilibili > /home/ubuntu/backups/rag_bilibili_$DATE.sql
+mysqldump -u raguser -p'your_password' rag_csdn > /home/ubuntu/backups/rag_csdn_$DATE.sql
 find /home/ubuntu/backups -name "*.sql" -mtime +7 -delete
 ```
 

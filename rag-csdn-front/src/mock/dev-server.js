@@ -1,6 +1,23 @@
 import { ERROR_CODES } from "../constants/error-codes";
 
-const DB_KEY = "rag-bilibili-dev-db";
+const DB_KEY = "rag-csdn-dev-db";
+const LEGACY_DB_KEY = "rag-bilibili-dev-db";
+
+function readStoredDb() {
+  const currentValue = localStorage.getItem(DB_KEY);
+  if (currentValue) {
+    return currentValue;
+  }
+
+  const legacyValue = localStorage.getItem(LEGACY_DB_KEY);
+  if (legacyValue) {
+    localStorage.setItem(DB_KEY, legacyValue);
+    localStorage.removeItem(LEGACY_DB_KEY);
+    return legacyValue;
+  }
+
+  return null;
+}
 
 function nowString() {
   const now = new Date();
@@ -164,7 +181,7 @@ function defaultDatabase() {
 }
 
 function readDatabase() {
-  const raw = localStorage.getItem(DB_KEY);
+  const raw = readStoredDb();
   if (!raw) {
     const seeded = defaultDatabase();
     writeDatabase(seeded);
@@ -185,6 +202,7 @@ function readDatabase() {
 
 function writeDatabase(db) {
   localStorage.setItem(DB_KEY, JSON.stringify(normalizeDatabase(db)));
+  localStorage.removeItem(LEGACY_DB_KEY);
 }
 
 function delay(ms = 220) {

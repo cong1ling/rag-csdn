@@ -2,7 +2,7 @@
   <header class="site-header" :class="{ 'is-scrolled': isScrolled }">
     <div class="header-container">
       <RouterLink to="/" class="header-brand">
-        <div class="nav-mark">RB</div>
+        <div class="nav-mark">RC</div>
         <span class="logo-text">RAG CSDN</span>
       </RouterLink>
 

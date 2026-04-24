@@ -157,7 +157,7 @@
     <footer class="footer">
         <div class="footer-content">
           <div class="footer-brand">
-            <div class="nav-mark">RB</div>
+            <div class="nav-mark">RC</div>
             <div>
             <div class="logo-text">RAG CSDN</div>
             <p class="footer-tagline">企业级智能知识管理系统</p>

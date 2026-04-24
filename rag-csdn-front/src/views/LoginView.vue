@@ -7,7 +7,7 @@
       <div class="auth-card surface-strong">
         <div class="auth-header">
           <RouterLink to="/" class="auth-logo">
-            <span class="logo-icon">RB</span>
+            <span class="logo-icon">RC</span>
             <span class="logo-text">RAG CSDN</span>
           </RouterLink>
           <h1 class="auth-title">登录工作台</h1>

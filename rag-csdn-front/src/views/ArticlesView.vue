@@ -190,7 +190,7 @@
     >
       <div class="guide-welcome-content">
         <div class="guide-hero">
-          <div class="nav-mark">RB</div>
+          <div class="nav-mark">RC</div>
           <div class="hero-text">
             <h3>开启你的智能文章知识库</h3>
             <p>只需简单三步，即可将 CSDN 社区文章转化为可随时提问的专家级助手。</p>
@@ -265,11 +265,27 @@ const rebuildSubmitting = ref(false);
 const rebuildInlineError = ref("");
 const rebuildTarget = ref(null);
 
-const GUIDE_STORAGE_KEY = "rag-bilibili-guide-shown";
+const GUIDE_STORAGE_KEY = "rag-csdn-guide-shown";
+const LEGACY_GUIDE_STORAGE_KEY = "rag-bilibili-guide-shown";
+
+function hasSeenGuide() {
+  const currentValue = localStorage.getItem(GUIDE_STORAGE_KEY);
+  if (currentValue) {
+    return true;
+  }
+
+  const legacyValue = localStorage.getItem(LEGACY_GUIDE_STORAGE_KEY);
+  if (legacyValue) {
+    localStorage.setItem(GUIDE_STORAGE_KEY, legacyValue);
+    localStorage.removeItem(LEGACY_GUIDE_STORAGE_KEY);
+    return true;
+  }
+
+  return false;
+}
 
 onMounted(() => {
-  const guideShown = localStorage.getItem(GUIDE_STORAGE_KEY);
-  if (!guideShown) {
+  if (!hasSeenGuide()) {
     guideVisible.value = true;
   }
 });
@@ -277,6 +293,7 @@ onMounted(() => {
 function closeGuide() {
   guideVisible.value = false;
   localStorage.setItem(GUIDE_STORAGE_KEY, "true");
+  localStorage.removeItem(LEGACY_GUIDE_STORAGE_KEY);
 }
 
 const filteredVideos = computed(() => {

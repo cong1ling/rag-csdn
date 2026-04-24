@@ -4,7 +4,7 @@
       <!-- Solid Sidebar -->
       <aside class="app-sidebar">
         <RouterLink to="/" class="nav-brand">
-          <div class="nav-mark">RB</div>
+          <div class="nav-mark">RC</div>
           <div class="nav-brand-text">
             <strong>RAG CSDN</strong>
             <div class="nav-brand-subtitle">Enterprise Workspace</div>
