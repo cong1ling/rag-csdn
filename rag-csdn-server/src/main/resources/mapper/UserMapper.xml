@@ -7,30 +7,41 @@
         <id column="id" property="id"/>
         <result column="username" property="username"/>
         <result column="password" property="password"/>
+        <result column="csdn_cookie_encrypted" property="csdnCookieEncrypted"/>
+        <result column="csdn_cookie_update_time" property="csdnCookieUpdateTime"/>
         <result column="create_time" property="createTime"/>
     </resultMap>
 
     <select id="selectByUsername" resultMap="BaseResultMap">
-        SELECT id, username, password, create_time
+        SELECT id, username, password, csdn_cookie_encrypted, csdn_cookie_update_time, create_time
         FROM user
         WHERE username = #{username}
     </select>
 
     <select id="selectById" resultMap="BaseResultMap">
-        SELECT id, username, password, create_time
+        SELECT id, username, password, csdn_cookie_encrypted, csdn_cookie_update_time, create_time
         FROM user
         WHERE id = #{id}
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user (username, password, create_time)
-        VALUES (#{username}, #{password}, #{createTime})
+        INSERT INTO user (username, password, csdn_cookie_encrypted, csdn_cookie_update_time, create_time)
+        VALUES (#{username}, #{password}, #{csdnCookieEncrypted}, #{csdnCookieUpdateTime}, #{createTime})
     </insert>
 
     <update id="update">
         UPDATE user
         SET username = #{username},
-            password = #{password}
+            password = #{password},
+            csdn_cookie_encrypted = #{csdnCookieEncrypted},
+            csdn_cookie_update_time = #{csdnCookieUpdateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateCsdnCookie">
+        UPDATE user
+        SET csdn_cookie_encrypted = #{csdnCookieEncrypted},
+            csdn_cookie_update_time = #{csdnCookieUpdateTime}
         WHERE id = #{id}
     </update>
 

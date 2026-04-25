@@ -27,5 +27,15 @@ public class User {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 加密后的 CSDN 登录态 Cookie
+     */
+    private String csdnCookieEncrypted;
+
+    /**
+     * CSDN 登录态更新时间
+     */
+    private LocalDateTime csdnCookieUpdateTime;
 }
 

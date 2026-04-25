@@ -24,5 +24,17 @@ class TaskExecutorConfigTest {
         assertEquals(true, ReflectionTestUtils.getField(executor, "waitForTasksToCompleteOnShutdown"));
         assertInstanceOf(ThreadPoolExecutor.CallerRunsPolicy.class, executor.getThreadPoolExecutor().getRejectedExecutionHandler());
     }
+
+    @Test
+    void shouldCreateDedicatedArticleImportExecutorWithLowConcurrency() {
+        ThreadPoolTaskExecutor executor = assertInstanceOf(ThreadPoolTaskExecutor.class, config.articleImportTaskExecutor());
+
+        assertEquals(1, executor.getCorePoolSize());
+        assertEquals(1, executor.getMaxPoolSize());
+        assertEquals(200, executor.getQueueCapacity());
+        assertEquals("article-import-", executor.getThreadNamePrefix());
+        assertEquals(true, ReflectionTestUtils.getField(executor, "waitForTasksToCompleteOnShutdown"));
+        assertInstanceOf(ThreadPoolExecutor.CallerRunsPolicy.class, executor.getThreadPoolExecutor().getRejectedExecutionHandler());
+    }
 }
 

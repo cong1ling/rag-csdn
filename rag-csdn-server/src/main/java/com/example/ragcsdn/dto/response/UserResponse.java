@@ -11,5 +11,7 @@ public class UserResponse {
     private String username;
     private String createTime;
     private String token;
+    private Boolean hasCsdnSession;
+    private String csdnSessionUpdateTime;
 }
 

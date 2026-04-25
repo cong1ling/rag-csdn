@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS `user` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户主键',
     `username` VARCHAR(50) NOT NULL COMMENT '用户名',
     `password` VARCHAR(255) NOT NULL COMMENT '密码（BCrypt加密）',
+    `csdn_cookie_encrypted` TEXT NULL COMMENT '加密后的CSDN登录态Cookie',
+    `csdn_cookie_update_time` DATETIME NULL COMMENT 'CSDN登录态更新时间',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_username` (`username`)

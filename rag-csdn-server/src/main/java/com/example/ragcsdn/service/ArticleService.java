@@ -1,8 +1,11 @@
 package com.example.ragcsdn.service;
 
 import com.example.ragcsdn.dto.request.ImportArticleRequest;
+import com.example.ragcsdn.dto.request.ImportAuthorArticlesRequest;
+import com.example.ragcsdn.dto.request.ImportRecommendedArticlesRequest;
 import com.example.ragcsdn.dto.request.RebuildArticleRequest;
 import com.example.ragcsdn.dto.response.ArticleResponse;
+import com.example.ragcsdn.dto.response.BatchImportResponse;
 import java.util.List;
 
 /**
@@ -13,6 +16,16 @@ public interface ArticleService {
      * 导入文章
      */
     ArticleResponse importArticle(ImportArticleRequest request, Long userId);
+
+    /**
+     * 批量导入作者公开文章
+     */
+    BatchImportResponse importAuthorArticles(ImportAuthorArticlesRequest request, Long userId);
+
+    /**
+     * 批量导入首页公开推荐文章
+     */
+    BatchImportResponse importRecommendedArticles(ImportRecommendedArticlesRequest request, Long userId);
 
     /**
      * 重建已有文章的切分与向量索引

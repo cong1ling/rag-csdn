@@ -1,11 +1,17 @@
 package com.example.ragcsdn.service.impl;
 
+import com.alibaba.cloud.ai.reader.csdn.CsdnArticleLink;
+import com.alibaba.cloud.ai.reader.csdn.CsdnDiscoveryReader;
 import com.alibaba.cloud.ai.reader.csdn.CsdnDocumentReader;
 import com.alibaba.cloud.ai.reader.csdn.CsdnResource;
 import com.alibaba.cloud.ai.vectorstore.dashvector.DashVectorStore;
 import com.example.ragcsdn.dto.request.ImportArticleRequest;
+import com.example.ragcsdn.dto.request.ImportAuthorArticlesRequest;
+import com.example.ragcsdn.dto.request.ImportRecommendedArticlesRequest;
 import com.example.ragcsdn.dto.request.RebuildArticleRequest;
 import com.example.ragcsdn.dto.response.ArticleResponse;
+import com.example.ragcsdn.dto.response.BatchImportItemResponse;
+import com.example.ragcsdn.dto.response.BatchImportResponse;
 import com.example.ragcsdn.entity.Article;
 import com.example.ragcsdn.entity.Chunk;
 import com.example.ragcsdn.entity.VectorMapping;
@@ -14,8 +20,10 @@ import com.example.ragcsdn.exception.BusinessException;
 import com.example.ragcsdn.exception.ErrorCode;
 import com.example.ragcsdn.mapper.*;
 import com.example.ragcsdn.service.ArticleService;
+import com.example.ragcsdn.service.UserService;
 import com.example.ragcsdn.util.ChunkDocumentSplitter;
 import com.example.ragcsdn.util.CsdnArticleUrlParser;
+import com.example.ragcsdn.util.CsdnAuthorUrlParser;
 import com.example.ragcsdn.util.VectorIDGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +39,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -62,22 +71,72 @@ public class ArticleServiceImpl implements ArticleService {
     private ArticleStatusWriter articleStatusWriter;
 
     @Autowired
-    @Qualifier("taskExecutor")
-    private TaskExecutor taskExecutor;
+    private UserService userService;
+
+    @Autowired
+    @Qualifier("articleImportTaskExecutor")
+    private TaskExecutor articleImportTaskExecutor;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
     @Transactional
     public ArticleResponse importArticle(ImportArticleRequest request, Long userId) {
+        return importSingleArticle(request.getArticleUrl(), userId);
+    }
+
+    @Override
+    public BatchImportResponse importAuthorArticles(ImportAuthorArticlesRequest request, Long userId) {
+        try {
+            String csdnSessionCookie = userService.getCsdnSessionCookie(userId);
+            CsdnDiscoveryReader discoveryReader = new CsdnDiscoveryReader(csdnSessionCookie);
+            List<CsdnArticleLink> links = discoveryReader.discoverAuthorArticles(
+                    request.getAuthorUrl(),
+                    request.getMaxArticles(),
+                    request.getMaxPages());
+
+            if (links.isEmpty()) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(), "未找到该作者当前公开可导入的文章");
+            }
+            return batchImportArticles("AUTHOR_PUBLIC", CsdnAuthorUrlParser.normalizeAuthorUrl(request.getAuthorUrl()), links, userId);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("批量导入作者文章失败: userId={}, authorUrl={}", userId, request.getAuthorUrl(), ex);
+            throw new BusinessException(ErrorCode.VIDEO_IMPORT_FAILED.getCode(), "作者文章列表抓取失败，请稍后重试");
+        }
+    }
+
+    @Override
+    public BatchImportResponse importRecommendedArticles(ImportRecommendedArticlesRequest request, Long userId) {
+        try {
+            String csdnSessionCookie = userService.getCsdnSessionCookie(userId);
+            CsdnDiscoveryReader discoveryReader = new CsdnDiscoveryReader(csdnSessionCookie);
+            List<CsdnArticleLink> links = discoveryReader.discoverRecommendedArticles(request.getLimit());
+            if (links.isEmpty()) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR.getCode(), "当前未发现可导入的公开推荐文章");
+            }
+            return batchImportArticles("HOME_RECOMMENDATIONS", "https://blog.csdn.net/", links, userId);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("批量导入推荐文章失败: userId={}", userId, ex);
+            throw new BusinessException(ErrorCode.VIDEO_IMPORT_FAILED.getCode(), "首页推荐文章抓取失败，请稍后重试");
+        }
+    }
+
+    private ArticleResponse importSingleArticle(String articleUrl, Long userId) {
         // 1. 解析 CSDN 文章地址
-        CsdnResource resource = new CsdnResource(request.getArticleUrl());
+        CsdnResource resource = new CsdnResource(articleUrl);
         String sourceId = resource.getArticleId();
-        String articleUrl = resource.getArticleUrl();
+        String normalizedArticleUrl = resource.getArticleUrl();
 
         // 2. 检查记录是否已存在
         Article existingArticle = articleMapper.selectByUserIdAndSourceId(userId, sourceId);
         if (existingArticle != null) {
+            if (ArticleStatus.FAILED.getCode().equals(existingArticle.getStatus())) {
+                return retryFailedArticle(existingArticle, normalizedArticleUrl, userId);
+            }
             throw new BusinessException(ErrorCode.VIDEO_ALREADY_EXISTS);
         }
 
@@ -85,7 +144,7 @@ public class ArticleServiceImpl implements ArticleService {
         Article article = new Article();
         article.setUserId(userId);
         article.setSourceId(sourceId);
-        article.setSourceUrl(articleUrl);
+        article.setSourceUrl(normalizedArticleUrl);
         article.setTitle("导入中...");
         article.setStatus(ArticleStatus.IMPORTING.getCode());
         article.setImportTime(LocalDateTime.now());
@@ -94,14 +153,85 @@ public class ArticleServiceImpl implements ArticleService {
         Long articleId = article.getId();
 
         // 4. 提交异步任务：抓取文章、切分、向量化
-        taskExecutor.execute(() -> executeImport(
+        articleImportTaskExecutor.execute(() -> executeImport(
                 articleId,
                 userId,
-                articleUrl,
+                normalizedArticleUrl,
                 sourceId,
                 false));
 
         return convertToResponse(article);
+    }
+
+    private ArticleResponse retryFailedArticle(Article article, String normalizedArticleUrl, Long userId) {
+        article.setSourceUrl(normalizedArticleUrl);
+        article.setStatus(ArticleStatus.IMPORTING.getCode());
+        article.setFailReason(null);
+        if (article.getTitle() == null || article.getTitle().isBlank()) {
+            article.setTitle("重新导入中...");
+        }
+        articleMapper.update(article);
+
+        articleImportTaskExecutor.execute(() -> executeImport(
+                article.getId(),
+                userId,
+                normalizedArticleUrl,
+                article.getSourceId(),
+                true));
+
+        return convertToResponse(article);
+    }
+
+    private BatchImportResponse batchImportArticles(String mode, String target, List<CsdnArticleLink> links, Long userId) {
+        BatchImportResponse response = new BatchImportResponse();
+        response.setMode(mode);
+        response.setTarget(target);
+        response.setDiscoveredCount(links.size());
+
+        int submittedCount = 0;
+        int duplicateCount = 0;
+        int failedCount = 0;
+
+        for (CsdnArticleLink link : links) {
+            BatchImportItemResponse item = new BatchImportItemResponse();
+            item.setSourceId(link.sourceId());
+            item.setSourceUrl(link.sourceUrl());
+            item.setTitle(link.title());
+
+            try {
+                ArticleResponse imported = importSingleArticle(link.sourceUrl(), userId);
+                item.setArticleId(imported.getId());
+                item.setStatus("SUBMITTED");
+                item.setMessage("已提交导入任务");
+                submittedCount++;
+            } catch (BusinessException ex) {
+                if (isDuplicateArticle(ex)) {
+                    item.setStatus("SKIPPED_DUPLICATE");
+                    item.setMessage(ex.getMessage());
+                    duplicateCount++;
+                } else {
+                    item.setStatus("FAILED");
+                    item.setMessage(ex.getMessage());
+                    failedCount++;
+                }
+            } catch (Exception ex) {
+                item.setStatus("FAILED");
+                item.setMessage(Objects.requireNonNullElse(ex.getMessage(), "批量导入失败"));
+                failedCount++;
+            }
+
+            response.getItems().add(item);
+        }
+
+        response.setSubmittedCount(submittedCount);
+        response.setDuplicateCount(duplicateCount);
+        response.setFailedCount(failedCount);
+        return response;
+    }
+
+    private boolean isDuplicateArticle(BusinessException ex) {
+        return ex.getErrorCode() == ErrorCode.VIDEO_ALREADY_EXISTS
+                || (ex.getErrorCode() == null && Objects.equals(ex.getCode(), ErrorCode.VIDEO_ALREADY_EXISTS.getCode()));
     }
 
     @Override
@@ -121,7 +251,7 @@ public class ArticleServiceImpl implements ArticleService {
         }
         articleMapper.update(article);
 
-        taskExecutor.execute(() -> executeImport(
+        articleImportTaskExecutor.execute(() -> executeImport(
                 articleId,
                 userId,
                 article.getSourceUrl(),
@@ -139,7 +269,8 @@ public class ArticleServiceImpl implements ArticleService {
                                boolean rebuildExistingIndex) {
         try {
             // 1. 使用 CSDN DocumentReader 读取文章内容
-            CsdnDocumentReader reader = new CsdnDocumentReader(new CsdnResource(articleUrl));
+            String csdnSessionCookie = userService.getCsdnSessionCookie(userId);
+            CsdnDocumentReader reader = new CsdnDocumentReader(new CsdnResource(articleUrl), csdnSessionCookie);
             List<Document> documents = reader.get();
 
             if (documents.isEmpty()) {

@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,7 +64,7 @@ class ArticleServiceImplTest {
     private ArticleStatusWriter articleStatusWriter;
 
     @Mock
-    private TaskExecutor taskExecutor;
+    private TaskExecutor articleImportTaskExecutor;
 
     @InjectMocks
     private ArticleServiceImpl articleService;
@@ -86,7 +87,7 @@ class ArticleServiceImplTest {
         }).when(articleMapper).insert(any(Article.class));
 
         when(chunkMapper.countByArticleId(100L)).thenReturn(0);
-        doNothing().when(taskExecutor).execute(any(Runnable.class));
+        doNothing().when(articleImportTaskExecutor).execute(any(Runnable.class));
 
         ArticleResponse response = articleService.importArticle(request, 1L);
 
@@ -102,7 +103,7 @@ class ArticleServiceImplTest {
         assertNotNull(response.getId());
 
         // 验证：异步任务已提交
-        verify(taskExecutor).execute(any(Runnable.class));
+        verify(articleImportTaskExecutor).execute(any(Runnable.class));
     }
 
     /**
@@ -123,6 +124,34 @@ class ArticleServiceImplTest {
     }
 
     @Test
+    void importArticleShouldRetryFailedRecordInsteadOfReportingDuplicate() {
+        ImportArticleRequest request = new ImportArticleRequest();
+        request.setArticleUrl("https://blog.csdn.net/test_author/article/details/147000001");
+
+        Article failedArticle = new Article();
+        failedArticle.setId(100L);
+        failedArticle.setUserId(1L);
+        failedArticle.setSourceId("147000001");
+        failedArticle.setSourceUrl("https://blog.csdn.net/test_author/article/details/147000001");
+        failedArticle.setTitle("旧失败记录");
+        failedArticle.setStatus(ArticleStatus.FAILED.getCode());
+        failedArticle.setFailReason("deadline exceeded");
+
+        when(articleMapper.selectByUserIdAndSourceId(1L, "147000001")).thenReturn(failedArticle);
+        when(chunkMapper.countByArticleId(100L)).thenReturn(0);
+        doNothing().when(articleImportTaskExecutor).execute(any(Runnable.class));
+
+        ArticleResponse response = articleService.importArticle(request, 1L);
+
+        assertEquals(100L, response.getId());
+        assertEquals(ArticleStatus.IMPORTING.getCode(), failedArticle.getStatus());
+        assertEquals(null, failedArticle.getFailReason());
+        verify(articleMapper).update(failedArticle);
+        verify(articleImportTaskExecutor).execute(any(Runnable.class));
+        verify(articleMapper, never()).insert(any(Article.class));
+    }
+
+    @Test
     void rebuildArticleShouldMarkRecordImportingAndSubmitAsyncTask() {
         RebuildArticleRequest request = new RebuildArticleRequest();
 
@@ -136,13 +165,13 @@ class ArticleServiceImplTest {
 
         when(articleMapper.selectById(100L)).thenReturn(article);
         when(chunkMapper.countByArticleId(100L)).thenReturn(12);
-        doNothing().when(taskExecutor).execute(any(Runnable.class));
+        doNothing().when(articleImportTaskExecutor).execute(any(Runnable.class));
 
         ArticleResponse response = articleService.rebuildArticle(100L, request, 1L);
 
         assertEquals("IMPORTING", response.getStatus());
         verify(articleMapper).update(article);
-        verify(taskExecutor).execute(any(Runnable.class));
+        verify(articleImportTaskExecutor).execute(any(Runnable.class));
     }
 
     @Test

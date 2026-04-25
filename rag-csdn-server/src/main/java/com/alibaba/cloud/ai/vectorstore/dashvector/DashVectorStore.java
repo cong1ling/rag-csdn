@@ -25,6 +25,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class DashVectorStore implements VectorStore {
+    private static final int DEFAULT_UPSERT_BATCH_SIZE = 8;
+    private static final int DEFAULT_UPSERT_MAX_RETRIES = 1;
+
     private final DashVectorCollection collection;
     private final String collectionName;
     private final EmbeddingModel embeddingModel;
@@ -32,11 +35,20 @@ public class DashVectorStore implements VectorStore {
     private final double defaultSimilarityThreshold;
     private final String metric;
     private final DashVectorFilterExpressionConverter filterExpressionConverter;
+    private final int upsertBatchSize;
+    private final int upsertMaxRetries;
 
     private static final Logger logger = LoggerFactory.getLogger(DashVectorStore.class);
 
     public DashVectorStore(DashVectorCollection collection, String collectionName, EmbeddingModel embeddingModel,
                            int defaultTopK, double defaultSimilarityThreshold, String metric) {
+        this(collection, collectionName, embeddingModel, defaultTopK, defaultSimilarityThreshold, metric,
+                DEFAULT_UPSERT_BATCH_SIZE, DEFAULT_UPSERT_MAX_RETRIES);
+    }
+
+    public DashVectorStore(DashVectorCollection collection, String collectionName, EmbeddingModel embeddingModel,
+                           int defaultTopK, double defaultSimilarityThreshold, String metric,
+                           int upsertBatchSize, int upsertMaxRetries) {
         this.collection = collection;
         this.collectionName = collectionName;
         this.embeddingModel = embeddingModel;
@@ -44,6 +56,8 @@ public class DashVectorStore implements VectorStore {
         this.defaultSimilarityThreshold = defaultSimilarityThreshold;
         this.metric = metric == null ? "cosine" : metric;
         this.filterExpressionConverter = new DashVectorFilterExpressionConverter();
+        this.upsertBatchSize = upsertBatchSize <= 0 ? DEFAULT_UPSERT_BATCH_SIZE : upsertBatchSize;
+        this.upsertMaxRetries = Math.max(0, upsertMaxRetries);
     }
 
     @Override
@@ -78,10 +92,51 @@ public class DashVectorStore implements VectorStore {
             docs.add(builder.build());
         }
 
-        Response<List<DocOpResult>> response = collection.upsert(UpsertDocRequest.builder().docs(docs).build());
-        if (!Boolean.TRUE.equals(response.isSuccess())) {
-            throw new IllegalStateException("Failed to upsert documents to DashVector: " + response.getMessage());
+        for (int start = 0; start < docs.size(); start += upsertBatchSize) {
+            int end = Math.min(start + upsertBatchSize, docs.size());
+            List<Doc> batch = docs.subList(start, end);
+            upsertBatch(batch);
         }
+    }
+
+    private void upsertBatch(List<Doc> docs) {
+        int attempt = 0;
+        while (true) {
+            try {
+                Response<List<DocOpResult>> response = collection.upsert(UpsertDocRequest.builder().docs(docs).build());
+                if (Boolean.TRUE.equals(response.isSuccess())) {
+                    return;
+                }
+
+                String message = response.getMessage();
+                if (attempt < upsertMaxRetries && isTransientUpsertFailure(message)) {
+                    attempt++;
+                    logger.warn("DashVector upsert batch failed, retrying attempt {}/{}: {}", attempt, upsertMaxRetries, message);
+                    continue;
+                }
+                throw new IllegalStateException("Failed to upsert documents to DashVector: " + message);
+            } catch (RuntimeException ex) {
+                if (attempt < upsertMaxRetries && isTransientUpsertFailure(ex.getMessage())) {
+                    attempt++;
+                    logger.warn("DashVector upsert batch threw transient error, retrying attempt {}/{}: {}",
+                            attempt, upsertMaxRetries, ex.getMessage());
+                    continue;
+                }
+                throw ex;
+            }
+        }
+    }
+
+    private boolean isTransientUpsertFailure(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        String normalized = message.toLowerCase();
+        return normalized.contains("deadline exceeded")
+                || normalized.contains("timed out")
+                || normalized.contains("timeout")
+                || normalized.contains("unavailable")
+                || normalized.contains("closed=");
     }
 
     @Override

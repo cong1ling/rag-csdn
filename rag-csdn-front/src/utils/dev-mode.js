@@ -7,12 +7,16 @@ export const DEV_ENTRY_USERNAME = "tsj060205";
 export const DEV_ENTRY_PASSWORD = "tsj060205";
 export const DEV_AUTH_STORAGE_KEY = "rag-csdn-dev-auth";
 export const LEGACY_DEV_AUTH_STORAGE_KEY = "rag-bilibili-dev-auth";
+export const DEV_CSDN_SESSION_STORAGE_KEY = "rag-csdn-dev-csdn-session";
+export const DEV_CSDN_SESSION_TIME_STORAGE_KEY = "rag-csdn-dev-csdn-session-time";
 
 export function getDevUserProfile() {
   return {
     id: 900000,
     username: DEV_ENTRY_USERNAME,
     createTime: "2026-03-10 20:00:00",
+    hasCsdnSession: sessionStorage.getItem(DEV_CSDN_SESSION_STORAGE_KEY) === "1",
+    csdnSessionUpdateTime: sessionStorage.getItem(DEV_CSDN_SESSION_TIME_STORAGE_KEY) || null,
   };
 }
 

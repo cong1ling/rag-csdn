@@ -110,6 +110,33 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function saveCsdnSession(payload) {
+    loading.value = true;
+    try {
+      user.value = await authApi.updateCsdnSession(payload);
+      logger.info("auth", "更新 CSDN 登录态成功", {
+        hasCsdnSession: user.value?.hasCsdnSession,
+        csdnSessionUpdateTime: user.value?.csdnSessionUpdateTime,
+      });
+      return user.value;
+    } finally {
+      initialized.value = true;
+      loading.value = false;
+    }
+  }
+
+  async function clearCsdnSession() {
+    loading.value = true;
+    try {
+      user.value = await authApi.clearCsdnSession();
+      logger.info("auth", "清除 CSDN 登录态成功");
+      return user.value;
+    } finally {
+      initialized.value = true;
+      loading.value = false;
+    }
+  }
+
   return {
     user,
     initialized,
@@ -122,5 +149,7 @@ export const useAuthStore = defineStore("auth", () => {
     login,
     enterDeveloperMode,
     logout,
+    saveCsdnSession,
+    clearCsdnSession,
   };
 });

@@ -9,6 +9,18 @@ export const articlesApi = {
     }
     return http.post("/articles", payload);
   },
+  importAuthorArticles(payload) {
+    if (isDeveloperModeEnabled()) {
+      return devServer.importAuthorArticles(payload);
+    }
+    return http.post("/articles/batch/author", payload);
+  },
+  importRecommendedArticles(payload = {}) {
+    if (isDeveloperModeEnabled()) {
+      return devServer.importRecommendedArticles(payload);
+    }
+    return http.post("/articles/batch/recommendations", payload);
+  },
   rebuild(id, payload = {}) {
     if (isDeveloperModeEnabled()) {
       return devServer.rebuildVideo(id, payload);

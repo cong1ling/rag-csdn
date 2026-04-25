@@ -48,6 +48,8 @@ spring:
         collection: csdn
         default-top-k: 5
         similarity-threshold: 0.35
+        upsert-batch-size: 8
+        upsert-max-retries: 1
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -62,6 +64,10 @@ server:
 jwt:
   secret: ${JWT_SECRET}
   expiration: 604800000
+
+app:
+  security:
+    credential-secret: ${CREDENTIALS_SECRET:${JWT_SECRET}}
 
 register:
   enabled: true

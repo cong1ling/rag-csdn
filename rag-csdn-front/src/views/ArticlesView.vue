@@ -56,12 +56,49 @@
           </div>
         </div>
 
+        <div class="library-toolbar">
+          <div class="filter-strip">
+            <el-button :type="statusFilter === 'ALL' ? 'primary' : 'default'" plain @click="statusFilter = 'ALL'">
+              全部 {{ videos.length }}
+            </el-button>
+            <el-button :type="statusFilter === 'SUCCESS' ? 'success' : 'default'" plain @click="statusFilter = 'SUCCESS'">
+              导入成功 {{ readyCount }}
+            </el-button>
+            <el-button :type="statusFilter === 'FAILED' ? 'danger' : 'default'" plain @click="statusFilter = 'FAILED'">
+              导入失败 {{ failedCount }}
+            </el-button>
+          </div>
+
+          <transition name="el-fade-in-linear">
+            <div v-if="selectedCount" class="batch-toolbar surface-strong">
+              <div class="batch-toolbar-copy">
+                <strong>已选 {{ selectedCount }} 篇文章</strong>
+                <p>支持跨分类多选，系统会逐篇提交重建任务。</p>
+              </div>
+              <div class="toolbar batch-toolbar-actions">
+                <el-button plain @click="selectAllFiltered">全选当前筛选结果</el-button>
+                <el-button plain @click="clearSelection">清空选择</el-button>
+                <el-button type="primary" :loading="batchRebuildSubmitting" @click="submitBatchRebuild">
+                  批量重建
+                </el-button>
+              </div>
+            </div>
+          </transition>
+        </div>
+
         <el-alert v-if="inlineError" class="alert-inline" type="error" :title="inlineError" show-icon />
 
         <div v-if="filteredVideos.length" class="bento-grid">
           <article v-for="video in filteredVideos" :key="video.id" class="bento-item bento-video">
             <div class="bento-item-header">
-              <span class="badge-inline code-text">{{ video.sourceId || video.bvid }}</span>
+              <div class="card-select-group">
+                <el-checkbox
+                  :model-value="isSelected(video.id)"
+                  :disabled="video.status === 'IMPORTING'"
+                  @change="toggleSelection(video)"
+                />
+                <span class="badge-inline code-text">{{ video.sourceId || video.bvid }}</span>
+              </div>
               <StatusPill :label="statusMeta(video.status).label" :tone="statusMeta(video.status).tone" />
             </div>
 
@@ -264,6 +301,14 @@ const rebuildDialogVisible = ref(false);
 const rebuildSubmitting = ref(false);
 const rebuildInlineError = ref("");
 const rebuildTarget = ref(null);
+// UI expectations for this feature:
+// 1. keyword search composes with status filtering
+// 2. selected IDs persist across filter switches
+// 3. IMPORTING items cannot be selected
+// 4. batch action bar appears only when selected IDs exist
+const statusFilter = ref("ALL");
+const selectedArticleIds = ref([]);
+const batchRebuildSubmitting = ref(false);
 
 const GUIDE_STORAGE_KEY = "rag-csdn-guide-shown";
 const LEGACY_GUIDE_STORAGE_KEY = "rag-bilibili-guide-shown";
@@ -298,15 +343,33 @@ function closeGuide() {
 
 const filteredVideos = computed(() => {
   const query = keyword.value.toLowerCase();
-  if (!query) {
-    return videos.value;
-  }
-  return videos.value.filter(
+  return statusFilteredVideos.value.filter(
     (video) =>
+      !query ||
       video.title?.toLowerCase().includes(query) ||
       (video.sourceId || video.bvid || "").toLowerCase().includes(query)
   );
 });
+
+const statusFilteredVideos = computed(() => {
+  if (statusFilter.value === "SUCCESS") {
+    return videos.value.filter((item) => item.status === "SUCCESS");
+  }
+  if (statusFilter.value === "FAILED") {
+    return videos.value.filter((item) => item.status === "FAILED");
+  }
+  return videos.value;
+});
+
+const selectableFilteredVideos = computed(() =>
+  filteredVideos.value.filter((item) => item.status !== "IMPORTING")
+);
+
+const selectedVideos = computed(() =>
+  videos.value.filter((item) => selectedArticleIds.value.includes(item.id))
+);
+
+const selectedCount = computed(() => selectedArticleIds.value.length);
 
 const readyCount = computed(() => videos.value.filter((item) => item.status === "SUCCESS").length);
 const failedCount = computed(() => videos.value.filter((item) => item.status === "FAILED").length);
@@ -322,11 +385,42 @@ async function loadVideos() {
   inlineError.value = "";
   try {
     videos.value = await articlesApi.list();
+    syncSelectionWithVideos();
   } catch (error) {
     inlineError.value = notifyError(error).message;
   } finally {
     loading.value = false;
   }
+}
+
+function syncSelectionWithVideos() {
+  const validIds = new Set(videos.value.map((item) => item.id));
+  selectedArticleIds.value = selectedArticleIds.value.filter((id) => validIds.has(id));
+}
+
+function isSelected(videoId) {
+  return selectedArticleIds.value.includes(videoId);
+}
+
+function toggleSelection(video) {
+  if (video.status === "IMPORTING") {
+    return;
+  }
+  if (isSelected(video.id)) {
+    selectedArticleIds.value = selectedArticleIds.value.filter((id) => id !== video.id);
+    return;
+  }
+  selectedArticleIds.value = [...selectedArticleIds.value, video.id];
+}
+
+function clearSelection() {
+  selectedArticleIds.value = [];
+}
+
+function selectAllFiltered() {
+  const visibleIds = selectableFilteredVideos.value.map((item) => item.id);
+  const merged = new Set([...selectedArticleIds.value, ...visibleIds]);
+  selectedArticleIds.value = Array.from(merged);
 }
 
 async function showVideoDetail(id) {
@@ -387,6 +481,59 @@ async function submitRebuild() {
   }
 }
 
+async function submitBatchRebuild() {
+  if (!selectedVideos.value.length) {
+    ElMessage.warning("请先选择需要重建的文章");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定批量重建 ${selectedVideos.value.length} 篇文章吗？系统会逐个提交重建任务。`,
+      "批量重建",
+      {
+        confirmButtonText: "确认提交",
+        cancelButtonText: "取消",
+        type: "warning",
+      }
+    );
+  } catch (error) {
+    if (error === "cancel") {
+      return;
+    }
+    notifyError(error);
+    return;
+  }
+
+  batchRebuildSubmitting.value = true;
+  let submittedCount = 0;
+  let failedSubmitCount = 0;
+
+  try {
+    for (const video of selectedVideos.value) {
+      try {
+        await articlesApi.rebuild(video.id);
+        submittedCount += 1;
+      } catch (error) {
+        failedSubmitCount += 1;
+      }
+    }
+
+    if (failedSubmitCount > 0) {
+      ElMessage.warning(`批量重建已提交 ${submittedCount} 篇，失败 ${failedSubmitCount} 篇`);
+    } else {
+      ElMessage.success(`批量重建已提交 ${submittedCount} 篇`);
+    }
+
+    clearSelection();
+    await loadVideos();
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    batchRebuildSubmitting.value = false;
+  }
+}
+
 async function deleteVideo(video) {
   try {
     await ElMessageBox.confirm(
@@ -399,6 +546,9 @@ async function deleteVideo(video) {
       }
     );
     await articlesApi.remove(video.id);
+    if (isSelected(video.id)) {
+      selectedArticleIds.value = selectedArticleIds.value.filter((id) => id !== video.id);
+    }
     ElMessage.success("文章已删除");
     await loadVideos();
   } catch (error) {
@@ -491,6 +641,45 @@ async function deleteVideo(video) {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
 }
 
+.library-toolbar {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.filter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.batch-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-md);
+  background: var(--rb-panel-strong);
+}
+
+.batch-toolbar-copy strong {
+  color: var(--rb-text);
+}
+
+.batch-toolbar-copy p {
+  margin-top: 6px;
+  color: var(--rb-text-soft);
+  font-size: 0.9rem;
+}
+
+.batch-toolbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .bento-title {
   font-family: var(--font-heading);
   font-size: 1.25rem;
@@ -521,6 +710,13 @@ async function deleteVideo(video) {
   margin-top: auto;
   padding-top: 20px;
   border-top: 1px solid var(--rb-border);
+}
+
+.card-select-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .meta-label {
@@ -710,6 +906,16 @@ async function deleteVideo(video) {
   }
 
   .action-btn {
+    width: 100%;
+  }
+
+  .batch-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-strip,
+  .batch-toolbar-actions {
     width: 100%;
   }
 }

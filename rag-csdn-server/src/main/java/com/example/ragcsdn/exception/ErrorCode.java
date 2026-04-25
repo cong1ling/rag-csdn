@@ -30,6 +30,8 @@ public enum ErrorCode {
     VIDEO_ALREADY_EXISTS(1002, "该文章已导入", 409),
     VIDEO_IMPORT_FAILED(1003, "文章导入失败", 500),
     VIDEO_NO_SUBTITLE(1004, "文章正文为空或无法提取有效内容", 422),
+    CSDN_SESSION_INVALID(1006, "CSDN登录态格式无效，请粘贴完整的 Cookie", 400),
+    CREDENTIAL_STORAGE_ERROR(1007, "登录态存储不可用，请检查服务端密钥配置", 500),
 
     // 会话相关
     SESSION_NOT_FOUND(2001, "会话不存在", 404),

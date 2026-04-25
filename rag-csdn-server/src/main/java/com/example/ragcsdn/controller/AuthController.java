@@ -3,6 +3,7 @@ package com.example.ragcsdn.controller;
 import com.example.ragcsdn.common.Result;
 import com.example.ragcsdn.dto.request.LoginRequest;
 import com.example.ragcsdn.dto.request.RegisterRequest;
+import com.example.ragcsdn.dto.request.UpdateCsdnSessionRequest;
 import com.example.ragcsdn.dto.response.UserResponse;
 import com.example.ragcsdn.exception.BusinessException;
 import com.example.ragcsdn.exception.ErrorCode;
@@ -69,6 +70,16 @@ public class AuthController {
     public Result<UserResponse> current() {
         Long userId = UserContext.get();
         return Result.success(userService.getCurrentUser(userId));
+    }
+
+    @PutMapping("/csdn-session")
+    public Result<UserResponse> saveCsdnSession(@Valid @RequestBody UpdateCsdnSessionRequest request) {
+        return Result.success(userService.saveCsdnSession(request, UserContext.get()));
+    }
+
+    @DeleteMapping("/csdn-session")
+    public Result<UserResponse> clearCsdnSession() {
+        return Result.success(userService.clearCsdnSession(UserContext.get()));
     }
 
     /**

@@ -37,7 +37,9 @@ public class DashVectorConfig {
                 embeddingModel,
                 properties.getDefaultTopK() == null ? 10 : properties.getDefaultTopK(),
                 properties.getSimilarityThreshold() == null ? 0.0 : properties.getSimilarityThreshold(),
-                StringUtils.hasText(properties.getMetric()) ? properties.getMetric() : "cosine"
+                StringUtils.hasText(properties.getMetric()) ? properties.getMetric() : "cosine",
+                properties.getUpsertBatchSize() == null ? 8 : properties.getUpsertBatchSize(),
+                properties.getUpsertMaxRetries() == null ? 1 : properties.getUpsertMaxRetries()
         );
     }
 }

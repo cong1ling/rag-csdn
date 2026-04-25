@@ -10,6 +10,8 @@ public class DashVectorProperties {
     private Integer defaultTopK = 10;
     private Double similarityThreshold = 0.0;
     private String metric = "cosine";
+    private Integer upsertBatchSize = 8;
+    private Integer upsertMaxRetries = 1;
 
     public String getApiKey() {
         return apiKey;
@@ -57,6 +59,22 @@ public class DashVectorProperties {
 
     public void setMetric(String metric) {
         this.metric = metric;
+    }
+
+    public Integer getUpsertBatchSize() {
+        return upsertBatchSize;
+    }
+
+    public void setUpsertBatchSize(Integer upsertBatchSize) {
+        this.upsertBatchSize = upsertBatchSize;
+    }
+
+    public Integer getUpsertMaxRetries() {
+        return upsertMaxRetries;
+    }
+
+    public void setUpsertMaxRetries(Integer upsertMaxRetries) {
+        this.upsertMaxRetries = upsertMaxRetries;
     }
 }
 

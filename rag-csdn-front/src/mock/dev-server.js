@@ -53,9 +53,33 @@ function extractArticleInfo(input) {
   return matched
     ? {
         sourceId: matched[1],
-        sourceUrl: normalized.split("?")[0],
+      sourceUrl: normalized.split("?")[0],
       }
     : null;
+}
+
+function extractAuthorInfo(input) {
+  const normalized = String(input || "").trim();
+  const matched = normalized.match(/blog\.csdn\.net\/([^/?#]+)/i);
+  return matched ? matched[1] : null;
+}
+
+function createVideoRecord(db, articleInfo, title, description) {
+  const video = {
+    id: db.nextVideoId++,
+    bvid: articleInfo.sourceId,
+    sourceId: articleInfo.sourceId,
+    sourceUrl: articleInfo.sourceUrl,
+    title,
+    description,
+    chunkCount: 24 + Math.floor(Math.random() * 24),
+    importTime: nowString(),
+    status: "SUCCESS",
+    failReason: null,
+  };
+
+  db.videos.unshift(video);
+  return video;
 }
 
 function normalizeSession(session) {
@@ -325,22 +349,127 @@ export const devServer = {
       throw createError(ERROR_CODES.VIDEO_ALREADY_EXISTS, "该文章已存在，请先删除后再导入。");
     }
 
-    const video = {
-      id: db.nextVideoId++,
-      bvid: articleInfo.sourceId,
-      sourceId: articleInfo.sourceId,
-      sourceUrl: articleInfo.sourceUrl,
-      title: `开发模式文章 ${articleInfo.sourceId}`,
-      description: "该记录由前端本地开发模式生成，用于测试 CSDN 文章导入、会话和问答流程。",
-      chunkCount: 24 + Math.floor(Math.random() * 24),
-      importTime: nowString(),
-      status: "SUCCESS",
-      failReason: null,
-    };
-
-    db.videos.unshift(video);
+    const video = createVideoRecord(
+      db,
+      articleInfo,
+      `开发模式文章 ${articleInfo.sourceId}`,
+      "该记录由前端本地开发模式生成，用于测试 CSDN 文章导入、会话和问答流程。"
+    );
     writeDatabase(db);
     return video;
+  },
+
+  async importAuthorArticles(payload = {}) {
+    await delay();
+    const db = readDatabase();
+    const author = extractAuthorInfo(payload.authorUrl);
+    if (!author) {
+      throw createError(ERROR_CODES.PARAM_ERROR, "无法从输入内容中解析作者主页 URL。");
+    }
+
+    const limit = Math.max(1, Math.min(Number(payload.maxArticles) || 10, 30));
+    const items = [];
+    let submittedCount = 0;
+    let duplicateCount = 0;
+
+    for (let index = 1; index <= limit; index++) {
+      const sourceId = `${author.replace(/[^a-z0-9]/gi, "").slice(0, 8) || "author"}${String(index).padStart(4, "0")}`;
+      const sourceUrl = `https://blog.csdn.net/${author}/article/details/${sourceId}`;
+      const existing = db.videos.find((item) => item.sourceId === sourceId);
+      if (existing) {
+        duplicateCount++;
+        items.push({
+          articleId: existing.id,
+          sourceId,
+          sourceUrl,
+          title: existing.title,
+          status: "SKIPPED_DUPLICATE",
+          message: "该文章已存在，请先删除后再导入。",
+        });
+        continue;
+      }
+
+      const video = createVideoRecord(
+        db,
+        { sourceId, sourceUrl },
+        `${author} 的公开文章 ${index}`,
+        "该记录由前端本地开发模式批量生成，用于测试作者公开文章批量导入流程。"
+      );
+      submittedCount++;
+      items.push({
+        articleId: video.id,
+        sourceId,
+        sourceUrl,
+        title: video.title,
+        status: "SUBMITTED",
+        message: "已提交导入任务",
+      });
+    }
+
+    writeDatabase(db);
+    return {
+      mode: "AUTHOR_PUBLIC",
+      target: `https://blog.csdn.net/${author}`,
+      discoveredCount: limit,
+      submittedCount,
+      duplicateCount,
+      failedCount: 0,
+      items,
+    };
+  },
+
+  async importRecommendedArticles(payload = {}) {
+    await delay();
+    const db = readDatabase();
+    const limit = Math.max(1, Math.min(Number(payload.limit) || 8, 20));
+    const items = [];
+    let submittedCount = 0;
+    let duplicateCount = 0;
+
+    for (let index = 1; index <= limit; index++) {
+      const sourceId = `recommend${String(index).padStart(4, "0")}`;
+      const sourceUrl = `https://blog.csdn.net/recommend/article/details/${sourceId}`;
+      const existing = db.videos.find((item) => item.sourceId === sourceId);
+      if (existing) {
+        duplicateCount++;
+        items.push({
+          articleId: existing.id,
+          sourceId,
+          sourceUrl,
+          title: existing.title,
+          status: "SKIPPED_DUPLICATE",
+          message: "该文章已存在，请先删除后再导入。",
+        });
+        continue;
+      }
+
+      const video = createVideoRecord(
+        db,
+        { sourceId, sourceUrl },
+        `首页公开推荐文章 ${index}`,
+        "该记录由前端本地开发模式批量生成，用于测试首页公开推荐文章一键导入流程。"
+      );
+      submittedCount++;
+      items.push({
+        articleId: video.id,
+        sourceId,
+        sourceUrl,
+        title: video.title,
+        status: "SUBMITTED",
+        message: "已提交导入任务",
+      });
+    }
+
+    writeDatabase(db);
+    return {
+      mode: "HOME_RECOMMENDATIONS",
+      target: "https://blog.csdn.net/",
+      discoveredCount: limit,
+      submittedCount,
+      duplicateCount,
+      failedCount: 0,
+      items,
+    };
   },
 
   async listVideos() {

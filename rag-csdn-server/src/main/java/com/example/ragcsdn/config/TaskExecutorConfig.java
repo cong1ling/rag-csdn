@@ -41,5 +41,22 @@ public class TaskExecutorConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "articleImportTaskExecutor")
+    public TaskExecutor articleImportTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+
+        // 文章抓取使用低并发执行，避免批量导入时瞬间打满站点触发风控。
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("article-import-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+
+        executor.initialize();
+        return executor;
+    }
 }
 
